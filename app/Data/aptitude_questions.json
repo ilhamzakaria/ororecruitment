@@ -1,0 +1,793 @@
+[
+  {
+    "id": "q01",
+    "number": 1,
+    "prompt": "Mana dari ke-5 ini yang paling TIDAK mirip dengan 4 yang lain?",
+    "options": [
+      { "value": "a", "label": "A", "text": "Beruang" },
+      { "value": "b", "label": "B", "text": "Ular" },
+      { "value": "c", "label": "C", "text": "Sapi" },
+      { "value": "d", "label": "D", "text": "Anjing" },
+      { "value": "e", "label": "E", "text": "Harimau" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q02",
+    "number": 2,
+    "prompt": "Jika Anda mengatur ulang kata-kata \"LINKECI\", maka Anda akan mendapat nama sebuah:",
+    "options": [
+      { "value": "a", "label": "A", "text": "Lautan" },
+      { "value": "b", "label": "B", "text": "Negara" },
+      { "value": "c", "label": "C", "text": "Provinsi" },
+      { "value": "d", "label": "D", "text": "Kota" },
+      { "value": "e", "label": "E", "text": "Hewan" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q03",
+    "number": 3,
+    "prompt": "Mana dari ke-5 gambar ini yang paling melengkapi kalimat gambar tersebut?",
+    "promptImage": "assets/aptitude/questions/q03_prompt.png",
+    "options": [
+      { "value": "a", "label": "A", "image": "assets/aptitude/questions/q03_a.png" },
+      { "value": "b", "label": "B", "image": "assets/aptitude/questions/q03_b.png" },
+      { "value": "c", "label": "C", "image": "assets/aptitude/questions/q03_c.png" },
+      { "value": "d", "label": "D", "image": "assets/aptitude/questions/q03_d.png" },
+      { "value": "e", "label": "E", "image": "assets/aptitude/questions/q03_e.png" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q04",
+    "number": 4,
+    "prompt": "Mana dari ke-5 ini yang paling TIDAK mirip dengan 4 yang lain?",
+    "options": [
+      { "value": "a", "label": "A", "text": "Kentang" },
+      { "value": "b", "label": "B", "text": "Jagung" },
+      { "value": "c", "label": "C", "text": "Apel" },
+      { "value": "d", "label": "D", "text": "Wortel" },
+      { "value": "e", "label": "E", "text": "Kacang" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q05",
+    "number": 5,
+    "prompt": "Mana dari ke-5 gambar ini yang paling melengkapi kalimat gambar tersebut?",
+    "promptImage": "assets/aptitude/questions/q05_prompt.png",
+    "options": [
+      { "value": "a", "label": "A", "image": "assets/aptitude/questions/q05_a.png" },
+      { "value": "b", "label": "B", "image": "assets/aptitude/questions/q05_b.png" },
+      { "value": "c", "label": "C", "image": "assets/aptitude/questions/q05_c.jpg" },
+      { "value": "d", "label": "D", "image": "assets/aptitude/questions/q05_d.jpg" },
+      { "value": "e", "label": "E", "image": "assets/aptitude/questions/q05_e.jpg" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q06",
+    "number": 6,
+    "prompt": "Saat ini John berumur 12 tahun, yaitu 3 kali lebih tua dari adiknya. Berapa umur John saat umurnya 2 kali lebih tua dari umur adiknya?",
+    "options": [
+      { "value": "a", "label": "A", "text": "15" },
+      { "value": "b", "label": "B", "text": "16" },
+      { "value": "c", "label": "C", "text": "18" },
+      { "value": "d", "label": "D", "text": "20" },
+      { "value": "e", "label": "E", "text": "21" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q07",
+    "number": 7,
+    "prompt": "Mana dari ke-5 kata ini yang paling melengkapi kalimat tersebut? Jika \"Kakak Laki-laki\" itu \"Kakak Perempuan\", maka \"Keponakan Perempuan\" adalah:",
+    "options": [
+      { "value": "a", "label": "A", "text": "Ibu" },
+      { "value": "b", "label": "B", "text": "Anak Perempuan" },
+      { "value": "c", "label": "C", "text": "Bibi" },
+      { "value": "d", "label": "D", "text": "Paman" },
+      { "value": "e", "label": "E", "text": "Keponakan Laki-laki" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q08",
+    "number": 8,
+    "prompt": "Mana dari ke-5 huruf ini yang paling TIDAK mirip dengan 4 yang lain?",
+    "options": [
+      { "value": "a", "label": "A", "text": "A" },
+      { "value": "b", "label": "B", "text": "Z" },
+      { "value": "c", "label": "C", "text": "F" },
+      { "value": "d", "label": "D", "text": "N" },
+      { "value": "e", "label": "E", "text": "E" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q09",
+    "number": 9,
+    "prompt": "Mana dari ke-5 kata ini yang paling melengkapi kalimat tersebut? Jika \"Susu\" itu \"Gelas\", maka \"Surat\" itu:",
+    "options": [
+      { "value": "a", "label": "A", "text": "Stempel" },
+      { "value": "b", "label": "B", "text": "Ballpoin" },
+      { "value": "c", "label": "C", "text": "Amplop" },
+      { "value": "d", "label": "D", "text": "Buku" },
+      { "value": "e", "label": "E", "text": "Kiriman" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q10",
+    "number": 10,
+    "prompt": "Mana dari ke-5 ini yang paling TIDAK mirip dengan 4 yang lain?",
+    "options": [
+      { "value": "a", "label": "A", "image": "assets/aptitude/questions/q10_a.jpg" },
+      { "value": "b", "label": "B", "image": "assets/aptitude/questions/q10_b.jpg" },
+      { "value": "c", "label": "C", "image": "assets/aptitude/questions/q10_c.jpg" },
+      { "value": "d", "label": "D", "image": "assets/aptitude/questions/q10_d.jpg" },
+      { "value": "e", "label": "E", "image": "assets/aptitude/questions/q10_e.jpg" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q11",
+    "number": 11,
+    "prompt": "Mana dari ke-5 kata ini yang paling melengkapi kalimat tersebut? Jika \"HIDUP\" itu \"PUDIH\" maka 5232 adalah:",
+    "options": [
+      { "value": "a", "label": "A", "text": "2523" },
+      { "value": "b", "label": "B", "text": "3252" },
+      { "value": "c", "label": "C", "text": "2325" },
+      { "value": "d", "label": "D", "text": "3225" },
+      { "value": "e", "label": "E", "text": "5223" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q12",
+    "number": 12,
+    "prompt": "\"Jika beberapa Smaugs adalah Thors dan beberapa Thors adalah Thrains, maka beberapa Smaugs pasti adalah Thrains.\" Pernyataan ini adalah:",
+    "options": [
+      { "value": "a", "label": "A", "text": "Benar" },
+      { "value": "b", "label": "B", "text": "Salah" },
+      { "value": "c", "label": "C", "text": "Tidak keduanya" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q13",
+    "number": 13,
+    "prompt": "Mana dari ke-5 ini yang paling TIDAK mirip dengan 4 yang lain?",
+    "options": [
+      { "value": "a", "label": "A", "image": "assets/aptitude/questions/q13_a.jpg" },
+      { "value": "b", "label": "B", "image": "assets/aptitude/questions/q13_b.jpg" },
+      { "value": "c", "label": "C", "image": "assets/aptitude/questions/q13_c.jpg" },
+      { "value": "d", "label": "D", "image": "assets/aptitude/questions/q13_d.jpg" },
+      { "value": "e", "label": "E", "image": "assets/aptitude/questions/q13_e.jpg" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q14",
+    "number": 14,
+    "prompt": "Mana dari ke-5 kata ini yang paling melengkapi kalimat tersebut? Jika \"Pohon\" itu \"Tanah\" maka \"Cerobong Asap\" itu:",
+    "options": [
+      { "value": "a", "label": "A", "text": "Asap" },
+      { "value": "b", "label": "B", "text": "Batu bata" },
+      { "value": "c", "label": "C", "text": "Langit" },
+      { "value": "d", "label": "D", "text": "Garasi" },
+      { "value": "e", "label": "E", "text": "Rumah" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q15",
+    "number": 15,
+    "prompt": "Mana dari angka-angka ini yang TIDAK masuk ke dalam urutan di bawah ini? Pilih huruf posisi yang tidak sesuai.",
+    "promptImage": "assets/aptitude/questions/q15_prompt.jpg",
+    "options": [
+      { "value": "a", "label": "A" },
+      { "value": "b", "label": "B" },
+      { "value": "c", "label": "C" },
+      { "value": "d", "label": "D" },
+      { "value": "e", "label": "E" },
+      { "value": "f", "label": "F" },
+      { "value": "g", "label": "G" },
+      { "value": "h", "label": "H" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q16",
+    "number": 16,
+    "prompt": "Mana dari ke-5 ini yang paling TIDAK mirip dengan 4 yang lain?",
+    "options": [
+      { "value": "a", "label": "A", "text": "Sentuh" },
+      { "value": "b", "label": "B", "text": "Rasa" },
+      { "value": "c", "label": "C", "text": "Dengar" },
+      { "value": "d", "label": "D", "text": "Senyum" },
+      { "value": "e", "label": "E", "text": "Lihat" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q17",
+    "number": 17,
+    "prompt": "Mana dari ke-5 gambar ini yang paling melengkapi kalimat gambar tersebut?",
+    "promptImage": "assets/aptitude/questions/q17_prompt.jpg",
+    "options": [
+      { "value": "a", "label": "A", "image": "assets/aptitude/questions/q17_a.jpg" },
+      { "value": "b", "label": "B", "image": "assets/aptitude/questions/q17_b.jpg" },
+      { "value": "c", "label": "C", "image": "assets/aptitude/questions/q17_c.jpg" },
+      { "value": "d", "label": "D", "image": "assets/aptitude/questions/q17_d.jpg" },
+      { "value": "e", "label": "E", "image": "assets/aptitude/questions/q17_e.jpg" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q18",
+    "number": 18,
+    "prompt": "Jack lebih tinggi dari Peter, dan Bill lebih pendek dari Jack. Mana kalimat yang paling akurat?",
+    "options": [
+      { "value": "a", "label": "A", "text": "Bill lebih tinggi dari Peter" },
+      { "value": "b", "label": "B", "text": "Bill lebih pendek dari Peter" },
+      { "value": "c", "label": "C", "text": "Bill sama tingginya dengan Peter" },
+      { "value": "d", "label": "D", "text": "Mustahil untuk mengetahui apakah Bill atau Peter yang lebih tinggi" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q19",
+    "number": 19,
+    "prompt": "Mana dari ke-5 ini yang paling TIDAK mirip dengan 4 yang lain?",
+    "options": [
+      { "value": "a", "label": "A", "text": "Kaus kaki" },
+      { "value": "b", "label": "B", "text": "Baju" },
+      { "value": "c", "label": "C", "text": "Sepatu" },
+      { "value": "d", "label": "D", "text": "Dompet" },
+      { "value": "e", "label": "E", "text": "Topi" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q20",
+    "number": 20,
+    "prompt": "Mana dari ke-5 kata ini yang paling melengkapi kalimat tersebut? Jika \"CAACCAC\" adalah \"3113313\" maka \"CACAACAC\" adalah:",
+    "options": [
+      { "value": "a", "label": "A", "text": "13133131" },
+      { "value": "b", "label": "B", "text": "13133313" },
+      { "value": "c", "label": "C", "text": "31311131" },
+      { "value": "d", "label": "D", "text": "31311313" },
+      { "value": "e", "label": "E", "text": "31313113" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q21",
+    "number": 21,
+    "prompt": "Jika Anda mengatur ulang kata \"RAPIS\", maka Anda akan mendapat nama sebuah:",
+    "options": [
+      { "value": "a", "label": "A", "text": "Lautan" },
+      { "value": "b", "label": "B", "text": "Negara" },
+      { "value": "c", "label": "C", "text": "Provinsi" },
+      { "value": "d", "label": "D", "text": "Kota" },
+      { "value": "e", "label": "E", "text": "Hewan" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q22",
+    "number": 22,
+    "prompt": "Mana dari ke-5 ini yang paling TIDAK mirip dengan 4 yang lain?",
+    "options": [
+      { "value": "a", "label": "A", "image": "assets/aptitude/questions/q22_a.jpg" },
+      { "value": "b", "label": "B", "image": "assets/aptitude/questions/q22_b.jpg" },
+      { "value": "c", "label": "C", "image": "assets/aptitude/questions/q22_c.jpg" },
+      { "value": "d", "label": "D", "image": "assets/aptitude/questions/q22_d.jpg" },
+      { "value": "e", "label": "E", "image": "assets/aptitude/questions/q22_e.jpg" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q23",
+    "number": 23,
+    "prompt": "Mana dari ke-5 kata ini yang paling melengkapi kalimat tersebut? Jika \"Peluru\" adalah \"Senjata\" maka \"Bola Api\" adalah:",
+    "options": [
+      { "value": "a", "label": "A", "text": "Pentungan" },
+      { "value": "b", "label": "B", "text": "Ketapel" },
+      { "value": "c", "label": "C", "text": "Meriam" },
+      { "value": "d", "label": "D", "text": "Pelempar" },
+      { "value": "e", "label": "E", "text": "Jepretan" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q24",
+    "number": 24,
+    "prompt": "\"Jika beberapa Bifurs adalah Bofurs dan semua Gloins adalah Bofurs, maka beberapa Bifurs pasti adalah Gloins.\" Pernyataan ini adalah:",
+    "options": [
+      { "value": "a", "label": "A", "text": "Benar" },
+      { "value": "b", "label": "B", "text": "Salah" },
+      { "value": "c", "label": "C", "text": "Tidak keduanya" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q25",
+    "number": 25,
+    "prompt": "Mana dari ke-5 ini yang paling TIDAK mirip dengan 4 yang lain?",
+    "options": [
+      { "value": "a", "label": "A", "image": "assets/aptitude/questions/q25_a.jpg" },
+      { "value": "b", "label": "B", "image": "assets/aptitude/questions/q25_b.jpg" },
+      { "value": "c", "label": "C", "image": "assets/aptitude/questions/q25_c.jpg" },
+      { "value": "d", "label": "D", "image": "assets/aptitude/questions/q25_d.jpg" },
+      { "value": "e", "label": "E", "image": "assets/aptitude/questions/q25_e.jpg" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q26",
+    "number": 26,
+    "prompt": "Mana dari angka-angka ini yang TIDAK masuk ke dalam urutan di bawah ini? A - D - G - I - J - M - P - S",
+    "options": [
+      { "value": "a", "label": "A", "text": "D" },
+      { "value": "b", "label": "B", "text": "I" },
+      { "value": "c", "label": "C", "text": "J" },
+      { "value": "d", "label": "D", "text": "M" },
+      { "value": "e", "label": "E", "text": "S" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q27",
+    "number": 27,
+    "prompt": "Mana dari ke-5 gambar ini yang paling melengkapi kalimat gambar tersebut?",
+    "promptImage": "assets/aptitude/questions/q27_prompt.jpg",
+    "options": [
+      { "value": "a", "label": "A", "image": "assets/aptitude/questions/q27_a.jpg" },
+      { "value": "b", "label": "B", "image": "assets/aptitude/questions/q27_b.jpg" },
+      { "value": "c", "label": "C", "image": "assets/aptitude/questions/q27_c.jpg" },
+      { "value": "d", "label": "D", "image": "assets/aptitude/questions/q27_d.jpg" },
+      { "value": "e", "label": "E", "image": "assets/aptitude/questions/q27_e.jpg" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q28",
+    "number": 28,
+    "prompt": "Harga dari sebuah baju di-discount 20% untuk sebuah acara tahunan. Berapa % baju tersebut harus di-naik-kan dari harga discount tersebut, sehingga harga baju tersebut menjadi sama dengan awalnya?",
+    "options": [
+      { "value": "a", "label": "A", "text": "15%" },
+      { "value": "b", "label": "B", "text": "20%" },
+      { "value": "c", "label": "C", "text": "25%" },
+      { "value": "d", "label": "D", "text": "30%" },
+      { "value": "e", "label": "E", "text": "40%" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q29",
+    "number": 29,
+    "prompt": "Mana dari ke-5 ini yang paling TIDAK mirip dengan 4 yang lain?",
+    "options": [
+      { "value": "a", "label": "A", "text": "Tembaga" },
+      { "value": "b", "label": "B", "text": "Besi" },
+      { "value": "c", "label": "C", "text": "Kuningan" },
+      { "value": "d", "label": "D", "text": "Emas" },
+      { "value": "e", "label": "E", "text": "Timah" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q30",
+    "number": 30,
+    "prompt": "Mana dari ke-5 gambar ini yang paling melengkapi kalimat gambar tersebut?",
+    "options": [
+      { "value": "a", "label": "A", "image": "assets/aptitude/questions/q30_a.jpg" },
+      { "value": "b", "label": "B", "image": "assets/aptitude/questions/q30_b.jpg" },
+      { "value": "c", "label": "C", "image": "assets/aptitude/questions/q30_c.jpg" },
+      { "value": "d", "label": "D", "image": "assets/aptitude/questions/q30_d.jpg" },
+      { "value": "e", "label": "E", "image": "assets/aptitude/questions/q30_e.jpg" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q31",
+    "number": 31,
+    "prompt": "Mana dari ke-5 ini yang paling TIDAK mirip dengan 4 yang lain?",
+    "options": [
+      { "value": "a", "label": "A", "text": "Botol" },
+      { "value": "b", "label": "B", "text": "Cangkir" },
+      { "value": "c", "label": "C", "text": "Bak" },
+      { "value": "d", "label": "D", "text": "Terowongan" },
+      { "value": "e", "label": "E", "text": "Mangkuk" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q32",
+    "number": 32,
+    "prompt": "Mary memiliki beberapa kue. Setelah makan 1 kue, Mary memberikan 1/2 dari sisanya untuk adiknya. Setelah makan 1 kue lagi, Mary memberikan 1/2 dari sisanya untuk adiknya. Mary sekarang hanya memiliki 5 kue. Berapakah jumlah awal kue yang dimiliki Mary?",
+    "options": [
+      { "value": "a", "label": "A", "text": "11" },
+      { "value": "b", "label": "B", "text": "22" },
+      { "value": "c", "label": "C", "text": "23" },
+      { "value": "d", "label": "D", "text": "45" },
+      { "value": "e", "label": "E", "text": "46" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q33",
+    "number": 33,
+    "prompt": "Mana dari ke-5 ini yang paling TIDAK mirip dengan 4 yang lain?",
+    "options": [
+      { "value": "a", "label": "A", "text": "Terigu" },
+      { "value": "b", "label": "B", "text": "Jerami" },
+      { "value": "c", "label": "C", "text": "Gandum" },
+      { "value": "d", "label": "D", "text": "Bubur" },
+      { "value": "e", "label": "E", "text": "Beras" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q34",
+    "number": 34,
+    "prompt": "Mana dari angka-angka ini yang TIDAK masuk ke dalam urutan di bawah ini? 2 - 3 - 6 - 7 - 8 - 14 - 15 - 30",
+    "options": [
+      { "value": "a", "label": "A", "text": "Tiga" },
+      { "value": "b", "label": "B", "text": "Tujuh" },
+      { "value": "c", "label": "C", "text": "Delapan" },
+      { "value": "d", "label": "D", "text": "Lima belas" },
+      { "value": "e", "label": "E", "text": "Tiga puluh" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q35",
+    "number": 35,
+    "prompt": "Mana dari ke-5 gambar ini yang paling melengkapi kalimat gambar tersebut?",
+    "promptImage": "assets/aptitude/questions/q35_prompt.jpg",
+    "options": [
+      { "value": "a", "label": "A", "image": "assets/aptitude/questions/q35_a.jpg" },
+      { "value": "b", "label": "B", "image": "assets/aptitude/questions/q35_b.jpg" },
+      { "value": "c", "label": "C", "image": "assets/aptitude/questions/q35_c.jpg" },
+      { "value": "d", "label": "D", "image": "assets/aptitude/questions/q35_d.jpg" },
+      { "value": "e", "label": "E", "image": "assets/aptitude/questions/q35_e.jpg" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q36",
+    "number": 36,
+    "prompt": "\"Sebuah pesawat ruang angkasa menerima 3 pesan dalam bahasa yang aneh dari sebuah planet di kejauhan. Para astronaut mempelajari pesan-pesan tersebut dan menemukan bahwa: 'Eros Aldarion Elendil' berarti 'Bahaya Ledakan Roket' dan 'Edain Mnyatur Elros' berarti 'Bahaya Kebakaran Pesawat Ruang Angkasa' dan 'Aldarion Gmilizor Gondor' berarti 'Ledakan Gas Yang Buruk'. Apakah arti dari 'Elendil'?\"",
+    "options": [
+      { "value": "a", "label": "A", "text": "Bahaya" },
+      { "value": "b", "label": "B", "text": "Ledakan" },
+      { "value": "c", "label": "C", "text": "Bukan apa-apa" },
+      { "value": "d", "label": "D", "text": "Roket" },
+      { "value": "e", "label": "E", "text": "Gas" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q37",
+    "number": 37,
+    "prompt": "Mana dari ke-5 gambar ini yang paling TIDAK mirip dengan 4 yang lain?",
+    "options": [
+      { "value": "a", "label": "A", "image": "assets/aptitude/questions/q37_a.jpg" },
+      { "value": "b", "label": "B", "image": "assets/aptitude/questions/q37_b.jpg" },
+      { "value": "c", "label": "C", "image": "assets/aptitude/questions/q37_c.jpg" },
+      { "value": "d", "label": "D", "image": "assets/aptitude/questions/q37_d.jpg" },
+      { "value": "e", "label": "E", "image": "assets/aptitude/questions/q37_e.jpg" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q38",
+    "number": 38,
+    "prompt": "Mana dari ke-5 kata ini yang paling melengkapi kalimat tersebut? Jika \"GESPER\" adalah \"Kepala Gesper\", maka \"SEPATU\" adalah:",
+    "options": [
+      { "value": "a", "label": "A", "text": "Kaos Kaki" },
+      { "value": "b", "label": "B", "text": "Tumit" },
+      { "value": "c", "label": "C", "text": "Kaki" },
+      { "value": "d", "label": "D", "text": "Tali Sepatu" },
+      { "value": "e", "label": "E", "text": "Sol Sepatu" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q39",
+    "number": 39,
+    "prompt": "Mana dari ke-5 gambar ini yang paling TIDAK mirip dengan 4 yang lain?",
+    "promptImage": "assets/aptitude/questions/q39_prompt.jpg",
+    "options": [
+      { "value": "a", "label": "A" },
+      { "value": "b", "label": "B" },
+      { "value": "c", "label": "C" },
+      { "value": "d", "label": "D" },
+      { "value": "e", "label": "E" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q40",
+    "number": 40,
+    "prompt": "John menerima USD 0.41 sebagai kembalian dari pembeliannya di apotik. Jika John menerima 6 koin, maka ketiga dari koin-koin tersebut harusnya:",
+    "options": [
+      { "value": "a", "label": "A", "text": "Satu Sen" },
+      { "value": "b", "label": "B", "text": "Lima sen" },
+      { "value": "c", "label": "C", "text": "Sepuluh sen" },
+      { "value": "d", "label": "D", "text": "Seperempat dollar" },
+      { "value": "e", "label": "E", "text": "Setengah dollar" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q41",
+    "number": 41,
+    "prompt": "Mana dari ke-5 gambar ini yang paling TIDAK mirip dengan 4 yang lain?",
+    "promptImage": "assets/aptitude/questions/q41_prompt.jpg",
+    "options": [
+      { "value": "a", "label": "A" },
+      { "value": "b", "label": "B" },
+      { "value": "c", "label": "C" },
+      { "value": "d", "label": "D" },
+      { "value": "e", "label": "E" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q42",
+    "number": 42,
+    "prompt": "Jika Anda mengatur ulang kata-kata \"RMANJE\", maka Anda akan mendapat nama sebuah:",
+    "options": [
+      { "value": "a", "label": "A", "text": "Lautan" },
+      { "value": "b", "label": "B", "text": "Negara" },
+      { "value": "c", "label": "C", "text": "Provinsi" },
+      { "value": "d", "label": "D", "text": "Kota" },
+      { "value": "e", "label": "E", "text": "Hewan" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q43",
+    "number": 43,
+    "prompt": "Mana dari ke-5 pilihan yang paling tepat untuk melengkapi kalimat berikut:",
+    "promptImage": "assets/aptitude/questions/q43_prompt.jpg",
+    "options": [
+      { "value": "a", "label": "A" },
+      { "value": "b", "label": "B" },
+      { "value": "c", "label": "C" },
+      { "value": "d", "label": "D" },
+      { "value": "e", "label": "E" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q44",
+    "number": 44,
+    "prompt": "\"Jika semua Wargs adalah Twerps dan tidak ada Twerps yang merupakan Gollums maka tidak ada Gollums yang pasti adalah Wargs.\" Pernyataan ini adalah:",
+    "options": [
+      { "value": "a", "label": "A", "text": "Benar" },
+      { "value": "b", "label": "B", "text": "Salah" },
+      { "value": "c", "label": "C", "text": "Tidak keduanya" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q45",
+    "number": 45,
+    "prompt": "Mana dari ke-5 ini yang paling TIDAK mirip dengan 4 yang lain?",
+    "options": [
+      { "value": "a", "label": "A", "text": "Kuda" },
+      { "value": "b", "label": "B", "text": "Kanguru" },
+      { "value": "c", "label": "C", "text": "Kuda Zebra" },
+      { "value": "d", "label": "D", "text": "Rusa" },
+      { "value": "e", "label": "E", "text": "Keledai" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q46",
+    "number": 46,
+    "prompt": "Mana dari gambar ini yang TIDAK sesuai dengan urutan gambar-gambar ini?",
+    "promptImage": "assets/aptitude/questions/q46_prompt.jpg",
+    "options": [
+      { "value": "a", "label": "A" },
+      { "value": "b", "label": "B" },
+      { "value": "c", "label": "C" },
+      { "value": "d", "label": "D" },
+      { "value": "e", "label": "E" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q47",
+    "number": 47,
+    "prompt": "Mana dari ke-5 kata ini yang paling melengkapi kalimat tersebut? Jika \"Jari\" adalah \"Tangan\" maka \"Daun\" adalah:",
+    "options": [
+      { "value": "a", "label": "A", "text": "Pohon" },
+      { "value": "b", "label": "B", "text": "Cabang" },
+      { "value": "c", "label": "C", "text": "Bunga" },
+      { "value": "d", "label": "D", "text": "Ranting" },
+      { "value": "e", "label": "E", "text": "Kulit Kayu" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q48",
+    "number": 48,
+    "prompt": "Ibunya John mengirimkannya ke toko untuk membeli 9 kotak besar jeruk. John hanya dapat membawa 2 kotak dalam sekali jalan. Berapa kali ia harus bolak-balik ke toko?",
+    "options": [
+      { "value": "a", "label": "A", "text": "4" },
+      { "value": "b", "label": "B", "text": "4 1/2" },
+      { "value": "c", "label": "C", "text": "5" },
+      { "value": "d", "label": "D", "text": "1/2" },
+      { "value": "e", "label": "E", "text": "6" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q49",
+    "number": 49,
+    "prompt": "Mana dari gambar ini yang TIDAK sesuai dengan urutan gambar-gambar ini?",
+    "promptImage": "assets/aptitude/questions/q49_prompt.jpg",
+    "options": [
+      { "value": "a", "label": "A" },
+      { "value": "b", "label": "B" },
+      { "value": "c", "label": "C" },
+      { "value": "d", "label": "D" },
+      { "value": "e", "label": "E" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q50",
+    "number": 50,
+    "prompt": "Mana dari ke-5 kata ini yang paling melengkapi kalimat tersebut? Jika \"Kaki\" adalah \"Lutut\", maka \"Tangan\" adalah:",
+    "options": [
+      { "value": "a", "label": "A", "text": "Jari" },
+      { "value": "b", "label": "B", "text": "Sikut" },
+      { "value": "c", "label": "C", "text": "Tumit" },
+      { "value": "d", "label": "D", "text": "Kaki" },
+      { "value": "e", "label": "E", "text": "Lengan" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q51",
+    "number": 51,
+    "prompt": "Mana gambar yang paling mengikuti logika dari diagram di bawah ini?",
+    "promptImage": "assets/aptitude/questions/q51_prompt.jpg",
+    "options": [
+      { "value": "a", "label": "A" },
+      { "value": "b", "label": "B" },
+      { "value": "c", "label": "C" },
+      { "value": "d", "label": "D" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q52",
+    "number": 52,
+    "prompt": "Mary ada di peringkat ke-13 dari yang terbaik dan juga peringkat ke-13 dari yang terburuk dalam lomba mengeja kata. Ada berapa peserta dalam lomba mengeja kata tersebut?",
+    "options": [
+      { "value": "a", "label": "A", "text": "13" },
+      { "value": "b", "label": "B", "text": "25" },
+      { "value": "c", "label": "C", "text": "26" },
+      { "value": "d", "label": "D", "text": "27" },
+      { "value": "e", "label": "E", "text": "28" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q53",
+    "number": 53,
+    "prompt": "Mana dari ke-5 kata ini yang paling melengkapi kalimat tersebut? Jika \"Air\" adalah \"Es Batu\", maka \"Susu\" adalah:",
+    "options": [
+      { "value": "a", "label": "A", "text": "Madu" },
+      { "value": "b", "label": "B", "text": "Keju" },
+      { "value": "c", "label": "C", "text": "Sereal" },
+      { "value": "d", "label": "D", "text": "Kopi" },
+      { "value": "e", "label": "E", "text": "Kue" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q54",
+    "number": 54,
+    "prompt": "Mana dari angka ini yang TIDAK sesuai dengan urutan angka-angka ini? Pilih huruf posisi yang tidak sesuai.",
+    "promptImage": "assets/aptitude/questions/q54_prompt.jpg",
+    "options": [
+      { "value": "a", "label": "A" },
+      { "value": "b", "label": "B" },
+      { "value": "c", "label": "C" },
+      { "value": "d", "label": "D" },
+      { "value": "e", "label": "E" },
+      { "value": "f", "label": "F" },
+      { "value": "g", "label": "G" },
+      { "value": "h", "label": "H" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q55",
+    "number": 55,
+    "prompt": "Mana dari ke-5 ini yang paling TIDAK mirip dengan 4 yang lain?",
+    "options": [
+      { "value": "a", "label": "A", "text": "Sayap" },
+      { "value": "b", "label": "B", "text": "Iga" },
+      { "value": "c", "label": "C", "text": "Salmon" },
+      { "value": "d", "label": "D", "text": "Ayam" },
+      { "value": "e", "label": "E", "text": "Sapi" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q56",
+    "number": 56,
+    "prompt": "\"Jika semua Fleeps adalah Sloops dan semua Sloops adalah Loopies, maka semua Fleeps pasti Loopies.\" Pernyataan ini adalah:",
+    "options": [
+      { "value": "a", "label": "A", "text": "Benar" },
+      { "value": "b", "label": "B", "text": "Salah" },
+      { "value": "c", "label": "C", "text": "Tidak keduanya" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q57",
+    "number": 57,
+    "prompt": "Mana dari ke-5 gambar ini yang paling melengkapi kalimat gambar tersebut?",
+    "promptImage": "assets/aptitude/questions/q57_prompt.jpg",
+    "options": [
+      { "value": "a", "label": "A" },
+      { "value": "b", "label": "B" },
+      { "value": "c", "label": "C" },
+      { "value": "d", "label": "D" },
+      { "value": "e", "label": "E" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q58",
+    "number": 58,
+    "prompt": "Mana dari ke-5 ini yang paling TIDAK mirip dengan 4 yang lain?",
+    "options": [
+      { "value": "a", "label": "A", "text": "Sentimeter" },
+      { "value": "b", "label": "B", "text": "Kilometer" },
+      { "value": "c", "label": "C", "text": "Hektar" },
+      { "value": "d", "label": "D", "text": "Meter" },
+      { "value": "e", "label": "E", "text": "Kaki" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q59",
+    "number": 59,
+    "prompt": "Mana dari ke-5 gambar ini yang paling melengkapi kalimat gambar tersebut?",
+    "promptImage": "assets/aptitude/questions/q59_prompt.jpg",
+    "options": [
+      { "value": "a", "label": "A" },
+      { "value": "b", "label": "B" },
+      { "value": "c", "label": "C" },
+      { "value": "d", "label": "D" },
+      { "value": "e", "label": "E" }
+    ],
+    "correctAnswer": null
+  },
+  {
+    "id": "q60",
+    "number": 60,
+    "prompt": "\"Seekor ikan mempunyai kepala sepanjang 9mm. Buntutnya sama panjangnya dengan ukuran kepalanya ditambah setengah kali ukuran badannya. Ukuran badannya adalah sama dengan ukuran kepala ditambah ukuran buntutnya.\" Berapa panjang ikan tersebut?",
+    "options": [
+      { "value": "a", "label": "A", "text": "27mm" },
+      { "value": "b", "label": "B", "text": "54mm" },
+      { "value": "c", "label": "C", "text": "63mm" },
+      { "value": "d", "label": "D", "text": "72mm" },
+      { "value": "e", "label": "E", "text": "81mm" }
+    ],
+    "correctAnswer": null
+  }
+]

@@ -1,0 +1,35 @@
+# CodeIgniter 4 .gitignore
+
+# Environment Files
+.env
+env
+*.env
+
+# Writable Directory
+writable/*
+!writable/.gitkeep
+writable/cache/*
+writable/debugbar/*
+writable/logs/*
+writable/session/*
+writable/uploads/*
+
+# Vendor Directory
+vendor/
+
+# User Files
+public/uploads/*
+
+# System/IDE Files
+.idea/
+.vscode/
+*.swp
+*.bak
+*.tmp
+*.log
+
+# Antigravity/Gemini Files
+.gemini/
+.sixth/
+scratch/
+catatan/
