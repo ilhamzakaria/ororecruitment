@@ -60,6 +60,15 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
         border: 1px solid var(--line);
     }
 
+    .option-img-preview {
+        max-width: 40px;
+        max-height: 40px;
+        object-fit: contain;
+        border-radius: 4px;
+        border: 1px solid var(--line);
+        background: #f8f9fa;
+    }
+
     .search-container {
         position: relative;
         width: 300px;
@@ -86,6 +95,21 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
         color: var(--line);
         margin-bottom: 16px;
         display: block;
+    }
+
+    .option-type-toggle {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+    }
+
+    .input-group-text-custom {
+        background: var(--soft);
+        font-weight: 800;
+        font-size: 12px;
+        width: 40px;
+        justify-content: center;
     }
 </style>
 <?= $this->endSection() ?>
@@ -126,17 +150,22 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
             <table class="table table-hover mb-0" id="questionTable">
                 <thead>
                     <tr>
+                        <th width="40">No</th>
                         <th>Tipe</th>
                         <th>Pertanyaan</th>
                         <th>Pilihan Jawaban</th>
                         <th>Jawaban Benar</th>
                         <th>Status</th>
+                        <th width="100">Urutan</th>
                         <th>Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($questions as $q) : ?>
                         <tr>
+                            <td class="text-center fw-800">
+                                <?= $q['urutan_pertanyaan'] ?>
+                            </td>
                             <td>
                                 <span class="badge bg-light text-dark text-uppercase"><?= $q['tipe_pertanyaan'] ?></span>
                             </td>
@@ -151,8 +180,22 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
                                 </div>
                             </td>
                             <td>
-                                <small class="d-block">A: <?= esc(substr($q['pilihan_a'], 0, 20)) ?>...</small>
-                                <small class="d-block">B: <?= esc(substr($q['pilihan_b'], 0, 20)) ?>...</small>
+                                <?php 
+                                    $opts = ['a', 'b', 'c', 'd', 'e'];
+                                    foreach ($opts as $o) : 
+                                        $tipe = $q['tipe_pilihan_'.$o] ?? 'text';
+                                        $val = $q['pilihan_'.$o];
+                                        $img = $q['gambar_pilihan_'.$o];
+                                ?>
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <span class="badge bg-soft text-primary fw-800" style="width: 20px; font-size: 10px;"><?= strtoupper($o) ?></span>
+                                        <?php if ($tipe === 'gambar' && $img) : ?>
+                                            <img src="<?= base_url($img) ?>" class="option-img-preview" alt="Opt <?= $o ?>">
+                                        <?php else : ?>
+                                            <small class="text-truncate" style="max-width: 150px;"><?= esc(substr($val, 0, 30)) ?><?= strlen($val) > 30 ? '...' : '' ?></small>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endforeach; ?>
                             </td>
                             <td class="text-center">
                                 <span class="badge bg-primary rounded-circle" style="width: 24px; height: 24px; display: inline-grid; place-items: center;"><?= $q['jawaban_benar'] ?></span>
@@ -161,6 +204,13 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
                                 <span class="status-pill status-<?= $q['status_pertanyaan'] ?>">
                                     <?= $q['status_pertanyaan'] ?>
                                 </span>
+                            </td>
+                            <td>
+                                <div class="d-flex gap-1 justify-content-center">
+                                    <button class="btn btn-light btn-sm p-0" style="width: 26px; height: 26px;" onclick="reorder('<?= $q['id_pertanyaan'] ?>', 'up')" title="Naik"><i class="bi bi-chevron-up"></i></button>
+                                    <button class="btn btn-light btn-sm p-0" style="width: 26px; height: 26px;" onclick="reorder('<?= $q['id_pertanyaan'] ?>', 'down')" title="Turun"><i class="bi bi-chevron-down"></i></button>
+                                    <button class="btn btn-light btn-sm p-0" style="width: 26px; height: 26px;" onclick="reorder('<?= $q['id_pertanyaan'] ?>', 'move')" title="Pindah ke nomor..."><i class="bi bi-hash"></i></button>
+                                </div>
                             </td>
                             <td>
                                 <div class="d-flex gap-2">
@@ -205,32 +255,36 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-700">Upload Gambar <small class="text-muted">(Opsional)</small></label>
-                                <input type="file" name="gambar_pertanyaan" class="form-control" accept="image/*">
+                                <input type="file" name="gambar_pertanyaan" class="form-control" accept="image/*" onchange="previewFile(this, 'add_gambar_preview')">
+                                <div id="add_gambar_preview" class="mt-2"></div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="row mt-3">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label fw-700">Pilihan A</label>
-                                <input type="text" name="pilihan_a" class="form-control" required>
+                    <h6 class="fw-800 mt-4 mb-3 border-bottom pb-2">Pilihan Jawaban (A-E)</h6>
+                    <div class="row">
+                        <?php foreach (['a', 'b', 'c', 'd', 'e'] as $o) : ?>
+                        <div class="col-md-6 mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label fw-700 mb-0">Pilihan <?= strtoupper($o) ?></label>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <input type="radio" class="btn-check" name="tipe_pilihan_<?= $o ?>" id="type_<?= $o ?>_text" value="text" checked onchange="toggleOptionInput('<?= $o ?>', 'add')">
+                                    <label class="btn btn-outline-secondary" for="type_<?= $o ?>_text">Text</label>
+                                    
+                                    <input type="radio" class="btn-check" name="tipe_pilihan_<?= $o ?>" id="type_<?= $o ?>_gambar" value="gambar" onchange="toggleOptionInput('<?= $o ?>', 'add')">
+                                    <label class="btn btn-outline-secondary" for="type_<?= $o ?>_gambar">Gambar</label>
+                                </div>
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-700">Pilihan B</label>
-                                <input type="text" name="pilihan_b" class="form-control" required>
+                            
+                            <div id="wrapper_<?= $o ?>_text_add">
+                                <input type="text" name="pilihan_<?= $o ?>" class="form-control" placeholder="Teks pilihan <?= $o ?>">
+                            </div>
+                            <div id="wrapper_<?= $o ?>_gambar_add" style="display: none;">
+                                <input type="file" name="gambar_pilihan_<?= $o ?>" class="form-control" accept="image/*" onchange="previewFile(this, 'add_preview_<?= $o ?>')">
+                                <div id="add_preview_<?= $o ?>" class="mt-2"></div>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label fw-700">Pilihan C</label>
-                                <input type="text" name="pilihan_c" class="form-control" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-700">Pilihan D</label>
-                                <input type="text" name="pilihan_d" class="form-control" required>
-                            </div>
-                        </div>
+                        <?php endforeach; ?>
                     </div>
 
                     <div class="row mt-3">
@@ -241,6 +295,7 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
                                 <option value="B">B</option>
                                 <option value="C">C</option>
                                 <option value="D">D</option>
+                                <option value="E">E</option>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -289,34 +344,37 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
                                 </select>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label fw-700">Update Gambar <small class="text-muted">(Biarkan kosong jika tidak diubah)</small></label>
-                                <input type="file" name="gambar_pertanyaan" class="form-control" accept="image/*">
+                                <label class="form-label fw-700">Update Gambar <small class="text-muted">(Kosongkan jika tidak diubah)</small></label>
+                                <input type="file" name="gambar_pertanyaan" class="form-control" accept="image/*" onchange="previewFile(this, 'edit_gambar_preview')">
                                 <div id="edit_gambar_preview" class="mt-2"></div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="row mt-3">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label fw-700">Pilihan A</label>
-                                <input type="text" name="pilihan_a" id="edit_pilihan_a" class="form-control" required>
+                    <h6 class="fw-800 mt-4 mb-3 border-bottom pb-2">Pilihan Jawaban (A-E)</h6>
+                    <div class="row">
+                        <?php foreach (['a', 'b', 'c', 'd', 'e'] as $o) : ?>
+                        <div class="col-md-6 mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label fw-700 mb-0">Pilihan <?= strtoupper($o) ?></label>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <input type="radio" class="btn-check" name="tipe_pilihan_<?= $o ?>" id="edit_type_<?= $o ?>_text" value="text" onchange="toggleOptionInput('<?= $o ?>', 'edit')">
+                                    <label class="btn btn-outline-secondary" for="edit_type_<?= $o ?>_text">Text</label>
+                                    
+                                    <input type="radio" class="btn-check" name="tipe_pilihan_<?= $o ?>" id="edit_type_<?= $o ?>_gambar" value="gambar" onchange="toggleOptionInput('<?= $o ?>', 'edit')">
+                                    <label class="btn btn-outline-secondary" for="edit_type_<?= $o ?>_gambar">Gambar</label>
+                                </div>
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-700">Pilihan B</label>
-                                <input type="text" name="pilihan_b" id="edit_pilihan_b" class="form-control" required>
+                            
+                            <div id="wrapper_<?= $o ?>_text_edit">
+                                <input type="text" name="pilihan_<?= $o ?>" id="edit_pilihan_<?= $o ?>" class="form-control">
+                            </div>
+                            <div id="wrapper_<?= $o ?>_gambar_edit" style="display: none;">
+                                <input type="file" name="gambar_pilihan_<?= $o ?>" class="form-control" accept="image/*" onchange="previewFile(this, 'edit_preview_<?= $o ?>')">
+                                <div id="edit_preview_<?= $o ?>" class="mt-2"></div>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label fw-700">Pilihan C</label>
-                                <input type="text" name="pilihan_c" id="edit_pilihan_c" class="form-control" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-700">Pilihan D</label>
-                                <input type="text" name="pilihan_d" id="edit_pilihan_d" class="form-control" required>
-                            </div>
-                        </div>
+                        <?php endforeach; ?>
                     </div>
 
                     <div class="row mt-3">
@@ -327,6 +385,7 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
                                 <option value="B">B</option>
                                 <option value="C">C</option>
                                 <option value="D">D</option>
+                                <option value="E">E</option>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -353,22 +412,84 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
 <script>
     const editModal = new bootstrap.Modal(document.getElementById('editQuestionModal'));
 
+    function toggleOptionInput(opt, mode) {
+        const modalId = mode === 'add' ? 'addQuestionModal' : 'editQuestionModal';
+        const modal = document.getElementById(modalId);
+        const type = modal.querySelector(`input[name="tipe_pilihan_${opt}"]:checked`)?.value || 'text';
+        const textWrap = document.getElementById(`wrapper_${opt}_text_${mode}`);
+        const imgWrap = document.getElementById(`wrapper_${opt}_gambar_${mode}`);
+        const textInput = textWrap.querySelector('input');
+        const imgInput = imgWrap.querySelector('input');
+        
+        if (type === 'gambar') {
+            textWrap.style.display = 'none';
+            imgWrap.style.display = 'block';
+            textInput.required = false;
+            
+            if (mode === 'add') {
+                imgInput.required = true;
+            } else {
+                const preview = document.getElementById(`edit_preview_${opt}`);
+                const hasExisting = preview && preview.querySelector('img') !== null;
+                imgInput.required = !hasExisting;
+            }
+        } else {
+            textWrap.style.display = 'block';
+            imgWrap.style.display = 'none';
+            textInput.required = true;
+            imgInput.required = false;
+        }
+    }
+
+    function previewFile(input, targetId) {
+        const preview = document.getElementById(targetId);
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                preview.innerHTML = `<img src="${e.target.result}" class="option-img-preview" style="width: 80px; height: 80px; object-fit: contain;">`;
+                if (input.required) input.required = false;
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
     function editQuestion(data) {
         document.getElementById('edit_id_pertanyaan').value = data.id_pertanyaan;
         document.getElementById('edit_isi_pertanyaan').value = data.isi_pertanyaan;
         document.getElementById('edit_tipe_pertanyaan').value = data.tipe_pertanyaan;
-        document.getElementById('edit_pilihan_a').value = data.pilihan_a;
-        document.getElementById('edit_pilihan_b').value = data.pilihan_b;
-        document.getElementById('edit_pilihan_c').value = data.pilihan_c;
-        document.getElementById('edit_pilihan_d').value = data.pilihan_d;
+        
+        const opts = ['a', 'b', 'c', 'd', 'e'];
+        opts.forEach(o => {
+            const tipe = data[`tipe_pilihan_${o}`] || 'text';
+            const val = data[`pilihan_${o}`];
+            const img = data[`gambar_pilihan_${o}`];
+            
+            // Set radio
+            document.getElementById(`edit_type_${o}_${tipe}`).checked = true;
+            
+            // Set text value
+            document.getElementById(`edit_pilihan_${o}`).value = val || '';
+            
+            // Set preview
+            const preview = document.getElementById(`edit_preview_${o}`);
+            if (img) {
+                preview.innerHTML = `<img src="<?= base_url() ?>${img}" class="option-img-preview" style="width: 60px; height: 60px;">`;
+            } else {
+                preview.innerHTML = '';
+            }
+            
+            // Toggle visibility
+            toggleOptionInput(o, 'edit');
+        });
+
         document.getElementById('edit_jawaban_benar').value = data.jawaban_benar;
         document.getElementById('edit_status_pertanyaan').value = data.status_pertanyaan;
         
-        const previewDiv = document.getElementById('edit_gambar_preview');
+        const mainPreview = document.getElementById('edit_gambar_preview');
         if (data.gambar_pertanyaan) {
-            previewDiv.innerHTML = `<img src="<?= base_url() ?>${data.gambar_pertanyaan}" class="question-img-preview" style="max-width: 100px; max-height: 100px;">`;
+            mainPreview.innerHTML = `<img src="<?= base_url() ?>${data.gambar_pertanyaan}" class="question-img-preview" style="max-width: 100px; max-height: 100px;">`;
         } else {
-            previewDiv.innerHTML = '';
+            mainPreview.innerHTML = '';
         }
         
         editModal.show();
@@ -398,6 +519,23 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
             if (result.ok) location.reload();
             else alert('Gagal menghapus pertanyaan');
         }
+    }
+
+    async function reorder(id, direction) {
+        if (direction === 'move') {
+            const newPos = prompt('Pindah ke urutan nomor berapa?');
+            if (newPos === null || newPos === '' || isNaN(newPos)) return;
+            direction = newPos;
+        }
+
+        const response = await fetch('<?= site_url('manage-questions/reorder') ?>', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `id=${id}&direction=${direction}`
+        });
+        const result = await response.json();
+        if (result.ok) location.reload();
+        else alert('Gagal mengubah urutan: ' + (result.message || 'Error unknown'));
     }
 
     // Search logic

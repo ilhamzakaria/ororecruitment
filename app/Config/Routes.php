@@ -23,6 +23,7 @@ $routes->post('/manage-questions/add', 'QuestionManagement::add');
 $routes->post('/manage-questions/update', 'QuestionManagement::update');
 $routes->post('/manage-questions/delete', 'QuestionManagement::delete');
 $routes->post('/manage-questions/toggle-status', 'QuestionManagement::toggleStatus');
+$routes->post('/manage-questions/reorder', 'QuestionManagement::reorder');
 
 $routes->get('/tes-interview', 'Home::index');
 $routes->post('/tes-interview/check', 'Home::checkStatus');

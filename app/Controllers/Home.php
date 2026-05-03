@@ -106,24 +106,56 @@ class Home extends BaseController
         $db = \Config\Database::connect();
         $results = $db->table('pertanyaan_tes')
             ->where('status_pertanyaan', 'Aktif')
+            ->orderBy('urutan_pertanyaan', 'ASC')
             ->get()
             ->getResultArray();
 
         $questions = [];
-        $i = 1;
+        $optionLetters = range('a', 'h');
+
         foreach ($results as $q) {
+            $options = [];
+            $maxOptionIndex = -1;
+
+            foreach ($optionLetters as $index => $suffix) {
+                $textVal = trim((string) ($q['pilihan_' . $suffix] ?? ''));
+                $imgVal = trim((string) ($q['gambar_pilihan_' . $suffix] ?? ''));
+
+                if ($textVal !== '' || $imgVal !== '') {
+                    $maxOptionIndex = $index;
+                }
+            }
+
+            if ($maxOptionIndex < 0) {
+                $maxOptionIndex = 3;
+            }
+
+            for ($index = 0; $index <= $maxOptionIndex; $index++) {
+                $suffix = $optionLetters[$index];
+                $label = strtoupper($suffix);
+                $tipe = $q['tipe_pilihan_' . $suffix] ?? 'text';
+                $textVal = trim((string) ($q['pilihan_' . $suffix] ?? ''));
+                $imgVal = trim((string) ($q['gambar_pilihan_' . $suffix] ?? ''));
+                $text = $tipe === 'text' ? $textVal : null;
+
+                if (! empty($q['gambar_pertanyaan']) && $text === $label && $imgVal === '') {
+                    $text = null;
+                }
+
+                $options[] = [
+                    'value'    => $label,
+                    'label'    => $label,
+                    'text'     => $text,
+                    'imageUrl' => $tipe === 'gambar' && $imgVal !== '' ? base_url($imgVal) : null,
+                ];
+            }
+
             $questions[] = [
-                'id'             => $q['id_pertanyaan'],
-                'number'         => $i++,
+                'id'             => (string) $q['id_pertanyaan'],
+                'number'         => $q['urutan_pertanyaan'],
                 'prompt'         => $q['isi_pertanyaan'],
-                'tipe'           => $q['tipe_pertanyaan'],
                 'promptImageUrl' => $q['gambar_pertanyaan'] ? base_url($q['gambar_pertanyaan']) : null,
-                'options'        => [
-                    ['value' => 'A', 'label' => 'A', 'text' => $q['pilihan_a']],
-                    ['value' => 'B', 'label' => 'B', 'text' => $q['pilihan_b']],
-                    ['value' => 'C', 'label' => 'C', 'text' => $q['pilihan_c']],
-                    ['value' => 'D', 'label' => 'D', 'text' => $q['pilihan_d']],
-                ]
+                'options'        => $options,
             ];
         }
 
