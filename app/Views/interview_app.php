@@ -475,7 +475,7 @@ $headerSubtitle = 'Sesi Tes Aptitude';
         padding: 12px;
         border: none;
         border-radius: 8px;
-        background: #262626;
+        background: var(--green-1);
         color: #fff;
         font-weight: 600;
         font-size: 14px;
