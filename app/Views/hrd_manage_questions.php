@@ -111,14 +111,37 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
         width: 40px;
         justify-content: center;
     }
+
+    /* Tab Styling */
+    .session-tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 24px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 0;
+    }
+    .session-tab {
+        padding: 12px 24px;
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--muted);
+        text-decoration: none;
+        border-bottom: 3px solid transparent;
+        transition: all 0.2s;
+    }
+    .session-tab:hover { color: var(--green-1); }
+    .session-tab.active {
+        color: var(--green-1);
+        border-bottom-color: var(--green-1);
+    }
 </style>
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
     <div>
-        <h1 class="h3 fw-800 mb-1">Isi Pertanyaan</h1>
-        <p class="text-muted small mb-0">Kelola daftar pertanyaan tes interview untuk calon pegawai.</p>
+        <h1 class="h3 fw-800 mb-1">Manajemen Pertanyaan</h1>
+        <p class="text-muted small mb-0">Kelola daftar pertanyaan tes interview berdasarkan sesi.</p>
     </div>
     <div class="d-flex gap-3 align-items-center">
         <div class="search-container">
@@ -129,6 +152,12 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
             <i class="bi bi-plus-lg"></i> Tambah Pertanyaan
         </button>
     </div>
+</div>
+
+<div class="session-tabs">
+    <a href="<?= site_url('manage-questions/1') ?>" class="session-tab <?= $currentSession == 1 ? 'active' : '' ?>">Sesi 1</a>
+    <a href="<?= site_url('manage-questions/2') ?>" class="session-tab <?= $currentSession == 2 ? 'active' : '' ?>">Sesi 2</a>
+    <a href="<?= site_url('manage-questions/3') ?>" class="session-tab <?= $currentSession == 3 ? 'active' : '' ?>">Sesi 3</a>
 </div>
 
 <?php if (session()->getFlashdata('success')) : ?>
@@ -231,7 +260,7 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
 <div class="modal fade" id="addQuestionModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content border-0 shadow">
-            <form action="<?= site_url('manage-questions/add') ?>" method="post" enctype="multipart/form-data">
+            <form action="<?= site_url('manage-questions/add/' . $currentSession) ?>" method="post" enctype="multipart/form-data">
                 <div class="modal-header border-0 bg-light">
                     <h5 class="modal-title fw-800">Tambah Pertanyaan Baru</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -320,7 +349,7 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
 <div class="modal fade" id="editQuestionModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content border-0 shadow">
-            <form action="<?= site_url('manage-questions/update') ?>" method="post" enctype="multipart/form-data">
+            <form action="<?= site_url('manage-questions/update/' . $currentSession) ?>" method="post" enctype="multipart/form-data">
                 <div class="modal-header border-0 bg-light">
                     <h5 class="modal-title fw-800">Edit Pertanyaan</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -497,7 +526,7 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
 
     async function toggleStatus(id, status) {
         if (confirm('Ubah status pertanyaan ini?')) {
-            const response = await fetch('<?= site_url('manage-questions/toggle-status') ?>', {
+            const response = await fetch('<?= site_url('manage-questions/toggle-status/' . $currentSession) ?>', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: `id=${id}&status=${status}`
@@ -510,7 +539,7 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
 
     async function deleteQuestion(id) {
         if (confirm('Apakah Anda yakin ingin menghapus pertanyaan ini?')) {
-            const response = await fetch('<?= site_url('manage-questions/delete') ?>', {
+            const response = await fetch('<?= site_url('manage-questions/delete/' . $currentSession) ?>', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: `id=${id}`
@@ -528,7 +557,7 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
             direction = newPos;
         }
 
-        const response = await fetch('<?= site_url('manage-questions/reorder') ?>', {
+        const response = await fetch('<?= site_url('manage-questions/reorder/' . $currentSession) ?>', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: `id=${id}&direction=${direction}`

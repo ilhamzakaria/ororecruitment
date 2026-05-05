@@ -8,6 +8,7 @@ class AddOptionsFToH extends Migration
 {
     public function up()
     {
+        /*
         $fields = [
             'pilihan_f' => [
                 'type' => 'TEXT',
@@ -67,6 +68,7 @@ class AddOptionsFToH extends Migration
         $this->db->query("ALTER TABLE pertanyaan_tes MODIFY COLUMN jawaban_benar ENUM('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H')");
         $this->db->query("ALTER TABLE jawaban_pegawai MODIFY COLUMN jawaban_dipilih ENUM('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H')");
         $this->db->query("ALTER TABLE jawaban_pegawai MODIFY COLUMN jawaban_benar ENUM('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H')");
+        */
     }
 
     public function down()

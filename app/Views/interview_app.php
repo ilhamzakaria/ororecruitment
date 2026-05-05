@@ -581,7 +581,7 @@ $headerSubtitle = 'Sesi Tes Aptitude';
         <div class="question-card">
             <div class="question-head">
                 <div>
-                    <span class="pill mb-2" id="questionCategory">Tes Aptitude</span>
+                    <span class="pill mb-2" id="questionCategory">Tes Aptitude - Sesi <?= $currentSession ?></span>
                     <h2 id="questionTitle" class="mb-3">Soal Aptitude</h2>
                     <div class="question-meta">
                         <span class="pill" id="questionIndex">Soal 1 / 60</span>
@@ -682,10 +682,10 @@ $headerSubtitle = 'Sesi Tes Aptitude';
 
 <div class="custom-alert-overlay" id="customAlertOverlay">
     <div class="custom-alert-box">
-        <div class="custom-alert-icon">
+        <div class="custom-alert-icon" id="customAlertIcon">
             <i class="bi bi-exclamation-circle-fill"></i>
         </div>
-        <h3 class="custom-alert-title">Akses Ditolak</h3>
+        <h3 class="custom-alert-title" id="customAlertTitle">Akses Ditolak</h3>
         <p class="custom-alert-message" id="customAlertMessage">Pesan error di sini.</p>
         <button class="custom-alert-btn" id="customAlertBtn">Mengerti</button>
     </div>
@@ -732,6 +732,7 @@ $headerSubtitle = 'Sesi Tes Aptitude';
         hrdName: '',
         sessionCode: '',
         isStarted: false,
+        currentSession: <?= $currentSession ?>,
     };
 
     const existingSession = <?= json_encode($existingSession ?? null, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
@@ -794,12 +795,25 @@ $headerSubtitle = 'Sesi Tes Aptitude';
         sessionCodeInp: document.getElementById('sessionCode'),
     };
 
-    function showCustomAlert(msg) {
+    function showCustomAlert(msg, title = 'Akses Ditolak', icon = 'bi-exclamation-circle-fill', btnText = 'Mengerti', callback = null) {
         const overlay = document.getElementById('customAlertOverlay');
+        const titleEl = document.getElementById('customAlertTitle');
         const msgEl = document.getElementById('customAlertMessage');
         const btnEl = document.getElementById('customAlertBtn');
+        const iconEl = document.getElementById('customAlertIcon');
 
+        titleEl.textContent = title;
         msgEl.textContent = msg;
+        btnEl.textContent = btnText;
+        iconEl.innerHTML = `<i class="bi ${icon}"></i>`;
+        
+        // Change icon color based on title or icon type if needed
+        if (title.toLowerCase().includes('selesai') || title.toLowerCase().includes('sukses')) {
+            iconEl.style.color = 'var(--green-1)';
+        } else {
+            iconEl.style.color = '#f5a623'; // Default orange
+        }
+
         overlay.style.display = 'flex';
 
         requestAnimationFrame(() => {
@@ -812,6 +826,7 @@ $headerSubtitle = 'Sesi Tes Aptitude';
             overlay.classList.remove('active');
             setTimeout(() => {
                 overlay.style.display = 'none';
+                if (callback) callback();
             }, 300);
         };
     }
@@ -961,7 +976,8 @@ $headerSubtitle = 'Sesi Tes Aptitude';
                     blockedCandidate: interviewState.isLocked,
                     message: msg,
                     violationType: eventType === 'violation_detected' ? 'security_breach' : '',
-                    answers: interviewState.answers
+                    answers: interviewState.answers,
+                    currentSession: interviewState.currentSession
                 })
             });
         } catch (e) {}
@@ -998,7 +1014,7 @@ $headerSubtitle = 'Sesi Tes Aptitude';
         const name = el.candidateNameInp.value.trim();
         const pos = el.positionNameInp.value.trim();
         const sessionCode = el.sessionCodeInp.value.trim();
-        if (!name || !pos) return alert('Mohon isi nama dan posisi terlebih dahulu.');
+        if (!name || !pos) return showCustomAlert('Mohon isi nama dan posisi terlebih dahulu.', 'Data Belum Lengkap');
 
         el.startBtn.disabled = true;
         const originalBtnText = el.startBtn.innerHTML;
@@ -1042,7 +1058,7 @@ $headerSubtitle = 'Sesi Tes Aptitude';
         syncSession('session_started');
 
         document.documentElement.requestFullscreen().catch(() => {
-            alert('Gagal masuk mode fullscreen. Mohon gunakan browser terbaru dan berikan izin.');
+            showCustomAlert('Gagal masuk mode fullscreen. Mohon gunakan browser terbaru dan berikan izin.', 'Fullscreen Gagal');
         });
     }
 
@@ -1069,22 +1085,56 @@ $headerSubtitle = 'Sesi Tes Aptitude';
         renderQuestion();
     });
 
-    el.finishBtn.addEventListener('click', () => {
+    el.finishBtn.addEventListener('click', async () => {
         saveCurrentAnswer();
-        const total = interviewData.length;
-        const answered = Object.keys(interviewState.answers).length;
-        const duration = Math.round((Date.now() - interviewState.startTime) / 60000);
+        
+        el.finishBtn.disabled = true;
+        el.finishBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Menyimpan...';
 
-        document.getElementById('summaryTotal').textContent = total;
-        document.getElementById('summaryAnswered').textContent = answered;
-        document.getElementById('summaryDuration').textContent = duration + 'm';
-        document.getElementById('summaryViolations').textContent = interviewState.violations;
+        const res = await fetch("<?= esc($completeSessionUrl) ?>", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sessionId: el.sessionCodeInp.value.trim() || 'SESI-<?= esc($authUser['id_user'] ?? uniqid()) ?>',
+                currentSession: interviewState.currentSession
+            })
+        });
+        const result = await res.json();
+        
+        if (result.ok) {
+            if (result.next) {
+                // Go to next session
+                showCustomAlert(
+                    'Anda akan melanjutkan ke Sesi ' + result.session + '. Pastikan Anda siap sebelum melanjutkan.',
+                    'Sesi ' + interviewState.currentSession + ' Selesai',
+                    'bi-check-circle-fill',
+                    'Lanjut ke Sesi ' + result.session,
+                    () => {
+                        location.reload();
+                    }
+                );
+            } else {
+                // All sessions completed
+                const total = interviewData.length;
+                const answered = Object.keys(interviewState.answers).length;
+                const duration = Math.round((Date.now() - interviewState.startTime) / 60000);
 
-        el.questionState.classList.remove('active');
-        el.summaryState.classList.add('active');
-        if (document.fullscreenElement) document.exitFullscreen();
+                document.getElementById('summaryTotal').textContent = total;
+                document.getElementById('summaryAnswered').textContent = answered;
+                document.getElementById('summaryDuration').textContent = duration + 'm';
+                document.getElementById('summaryViolations').textContent = interviewState.violations;
 
-        syncSession('session_completed');
+                el.questionState.classList.remove('active');
+                el.summaryState.classList.add('active');
+                if (document.fullscreenElement) document.exitFullscreen();
+
+                syncSession('session_completed');
+            }
+        } else {
+            showCustomAlert('Gagal menyelesaikan sesi: ' + (result.message || 'Error unknown'), 'Gagal Menyimpan');
+            el.finishBtn.disabled = false;
+            el.finishBtn.innerHTML = '<i class="bi bi-check-all"></i> Selesaikan Tes';
+        }
     });
 
     el.returnBtn.addEventListener('click', () => {

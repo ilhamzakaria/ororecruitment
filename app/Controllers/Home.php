@@ -28,19 +28,23 @@ class Home extends BaseController
         $db = \Config\Database::connect();
         $sessionId = $defaultIdentity['sessionCode'] ?: 'SESI-' . uniqid();
         $existingSession = $db->table('peserta')->where('session_id', $sessionId)->get()->getRowArray();
+        
+        $currentSession = (int) ($existingSession['current_session'] ?? 1);
 
         return view('interview_app', [
-            'questions' => $this->getQuestions(),
+            'questions' => $this->getQuestions($currentSession),
             'durationMinutes' => 30,
             'maxViolations' => 1,
             'tabSwitchLimit' => 1,
             'dashboardUrl' => $isHrd ? site_url('dashboard-hrd') : site_url('dashboard-user'),
             'dashboardLabel' => $isHrd ? 'Dashboard HRD' : 'Dashboard Pegawai',
             'monitorEventUrl' => site_url('monitoring/events'),
+            'completeSessionUrl' => site_url('tes-interview/complete'),
             'logoutUrl' => site_url('logout'),
             'authUser' => $authUser,
             'defaultIdentity' => $defaultIdentity,
             'existingSession' => $existingSession,
+            'currentSession' => $currentSession,
         ]);
     }
 
@@ -101,10 +105,10 @@ class Home extends BaseController
     /**
      * @return list<array<string, mixed>>
      */
-    private function getQuestions(): array
+    private function getQuestions(int $session = 1): array
     {
         $db = \Config\Database::connect();
-        $results = $db->table('pertanyaan_tes')
+        $results = $db->table("pertanyaan_sesi_$session")
             ->where('status_pertanyaan', 'Aktif')
             ->orderBy('urutan_pertanyaan', 'ASC')
             ->get()
@@ -193,5 +197,35 @@ class Home extends BaseController
         }
 
         return $this->response->setJSON(['blocked' => false]);
+    }
+
+    public function completeSession()
+    {
+        $json = $this->request->getJSON();
+        $sessionId = $json->sessionId ?? '';
+        $currentSession = (int)($json->currentSession ?? 1);
+
+        if ($sessionId === '') {
+            return $this->response->setJSON(['ok' => false, 'message' => 'Session ID required']);
+        }
+
+        $db = \Config\Database::connect();
+        
+        if ($currentSession < 3) {
+            $nextSession = $currentSession + 1;
+            $db->table('peserta')->where('session_id', $sessionId)->update([
+                'current_session' => $nextSession,
+                'status' => 'active', 
+                'answers' => null, 
+                'current_question' => 0,
+            ]);
+            return $this->response->setJSON(['ok' => true, 'next' => true, 'session' => $nextSession]);
+        } else {
+            $db->table('peserta')->where('session_id', $sessionId)->update([
+                'status' => 'completed',
+                'ended_at' => date('Y-m-d H:i:s'),
+            ]);
+            return $this->response->setJSON(['ok' => true, 'next' => false]);
+        }
     }
 }

@@ -18,15 +18,17 @@ $routes->post('/manage-users/restore', 'UserManagement::restore');
 $routes->post('/manage-users/update', 'UserManagement::update');
 $routes->post('/manage-users/add', 'UserManagement::add');
 
-$routes->get('/manage-questions', 'QuestionManagement::index');
-$routes->post('/manage-questions/add', 'QuestionManagement::add');
-$routes->post('/manage-questions/update', 'QuestionManagement::update');
-$routes->post('/manage-questions/delete', 'QuestionManagement::delete');
-$routes->post('/manage-questions/toggle-status', 'QuestionManagement::toggleStatus');
-$routes->post('/manage-questions/reorder', 'QuestionManagement::reorder');
+$routes->get('/manage-questions', 'QuestionManagement::index/1');
+$routes->get('/manage-questions/(:num)', 'QuestionManagement::index/$1');
+$routes->post('/manage-questions/add/(:num)', 'QuestionManagement::add/$1');
+$routes->post('/manage-questions/update/(:num)', 'QuestionManagement::update/$1');
+$routes->post('/manage-questions/delete/(:num)', 'QuestionManagement::delete/$1');
+$routes->post('/manage-questions/toggle-status/(:num)', 'QuestionManagement::toggleStatus/$1');
+$routes->post('/manage-questions/reorder/(:num)', 'QuestionManagement::reorder/$1');
 
 $routes->get('/tes-interview', 'Home::index');
 $routes->post('/tes-interview/check', 'Home::checkStatus');
+$routes->post('/tes-interview/complete', 'Home::completeSession');
 $routes->get('/dashboard-user', 'Home::dashboardUser');
 $routes->get('/dashboard-hrd', 'Monitoring::dashboard');
 $routes->get('/dashboard-hrd/data', 'Monitoring::dashboardData');

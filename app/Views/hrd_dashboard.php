@@ -104,6 +104,46 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
         .dashboard-grid { grid-template-columns: 1fr; }
         .hero-band { grid-template-columns: 1fr; }
     }
+
+    /* Modal Styling */
+    .modal-content { border-radius: 16px; border: none; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
+    .modal-header { border-bottom: 1px solid var(--line); padding: 24px; }
+    .modal-body { padding: 0; }
+    .modal-footer { border-top: 1px solid var(--line); padding: 20px; }
+    
+    .detail-summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 16px;
+        padding: 24px;
+        background: var(--soft);
+        border-bottom: 1px solid var(--line);
+    }
+    .detail-summary-item { display: flex; flex-direction: column; }
+    .detail-summary-label { font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .detail-summary-value { font-size: 16px; font-weight: 800; color: var(--ink); margin-top: 4px; }
+
+    .answer-list { padding: 24px; }
+    .answer-card {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 16px;
+        transition: all 0.2s ease;
+    }
+    .answer-card:hover { border-color: var(--green-3); background: #fafdfc; }
+    .answer-card.correct { border-left: 4px solid var(--green-1); }
+    .answer-card.wrong { border-left: 4px solid var(--danger); }
+    
+    .answer-num { width: 32px; height: 32px; border-radius: 8px; background: var(--soft); display: grid; place-items: center; font-weight: 800; font-size: 13px; color: var(--muted); }
+    .answer-status-badge { font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 4px 10px; border-radius: 6px; }
+    .badge-success-alt { background: #e6f6ef; color: #1f8f5e; }
+    .badge-danger-alt { background: #fff1f1; color: #c64747; }
+    
+    .img-answer { max-width: 200px; border-radius: 8px; border: 1px solid var(--line); margin-top: 10px; }
+    .img-question { max-width: 100%; border-radius: 12px; margin-bottom: 15px; border: 1px solid var(--line); }
+    
+    .scrollable-modal-body { max-height: 70vh; overflow-y: auto; }
 </style>
 <?= $this->endSection() ?>
 
@@ -164,8 +204,9 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
             <input type="text" id="filterPegawai" class="form-control form-control-sm" placeholder="Filter Pegawai..." style="width: 150px;">
             <select id="filterStatus" class="form-select form-select-sm" style="width: 120px;">
                 <option value="">Semua Status</option>
-                <option value="Benar">Benar</option>
-                <option value="Salah">Salah</option>
+                <option value="active">Active</option>
+                <option value="completed">Completed</option>
+                <option value="locked">Locked</option>
             </select>
             <input type="date" id="filterTanggal" class="form-control form-control-sm" style="width: 140px;">
         </div>
@@ -175,20 +216,96 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
             <thead>
                 <tr>
                     <th>Pegawai</th>
-                    <th>Pertanyaan</th>
-                    <th>Jawaban</th>
-                    <th>Benar</th>
-                    <th>Status</th>
-                    <th>Nilai</th>
-                    <th>Waktu</th>
+                    <th>Status Tes</th>
+                    <th class="text-center">Soal</th>
+                    <th class="text-center">Benar</th>
+                    <th class="text-center">Salah</th>
+                    <th class="text-center">Nilai</th>
+                    <th>Tanggal Tes</th>
+                    <th>Aksi</th>
                 </tr>
             </thead>
             <tbody id="answersTableBody">
-                <tr><td colspan="7" class="text-center py-4 text-muted">Memuat data...</td></tr>
+                <tr><td colspan="8" class="text-center py-4 text-muted">Memuat data...</td></tr>
             </tbody>
         </table>
     </div>
 </section>
+
+<!-- Modal Detail Jawaban -->
+<div class="modal fade" id="detailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title fw-800 mb-0" id="modalEmployeeName">Detail Jawaban</h5>
+                    <p class="text-muted small mb-0" id="modalEmployeeId">ID: -</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="detail-summary">
+                    <div class="detail-summary-item">
+                        <span class="detail-summary-label">Total Soal</span>
+                        <span class="detail-summary-value" id="modalTotalSoal">0</span>
+                    </div>
+                    <div class="detail-summary-item">
+                        <span class="detail-summary-label">Dijawab</span>
+                        <span class="detail-summary-value" id="modalTotalDijawab">0</span>
+                    </div>
+                    <div class="detail-summary-item text-success">
+                        <span class="detail-summary-label">Benar</span>
+                        <span class="detail-summary-value" id="modalBenar">0</span>
+                    </div>
+                    <div class="detail-summary-item text-danger">
+                        <span class="detail-summary-label">Salah</span>
+                        <span class="detail-summary-value" id="modalSalah">0</span>
+                    </div>
+                    <div class="detail-summary-item">
+                        <span class="detail-summary-label">Nilai Akhir</span>
+                        <span class="detail-summary-value" id="modalNilai">0</span>
+                    </div>
+                    <div class="detail-summary-item">
+                        <span class="detail-summary-label">Status Tes</span>
+                        <span class="detail-summary-value" id="modalStatusTes">-</span>
+                    </div>
+                    <div class="detail-summary-item">
+                        <span class="detail-summary-label">Tanggal Tes</span>
+                        <span class="detail-summary-value" id="modalTanggalTes">-</span>
+                    </div>
+                </div>
+                <div class="px-4 py-3">
+                    <div class="row g-2">
+                        <div class="col-4">
+                            <div class="p-2 bg-light rounded border text-center">
+                                <div class="small fw-bold text-muted" style="font-size: 10px;">SESI 1</div>
+                                <div class="fw-800" id="modalSesi1Stats" style="font-size: 12px;">-</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-2 bg-light rounded border text-center">
+                                <div class="small fw-bold text-muted" style="font-size: 10px;">SESI 2</div>
+                                <div class="fw-800" id="modalSesi2Stats" style="font-size: 12px;">-</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-2 bg-light rounded border text-center">
+                                <div class="small fw-bold text-muted" style="font-size: 10px;">SESI 3</div>
+                                <div class="fw-800" id="modalSesi3Stats" style="font-size: 12px;">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="scrollable-modal-body">
+                    <div id="modalAnswerList" class="answer-list"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+            </div>
+        </div>
+    </div>
+</div>
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
@@ -198,6 +315,7 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
         summary: <?= json_encode($summary) ?>,
         sessions: <?= json_encode($sessions) ?>,
         recentViolations: <?= json_encode($recentViolations) ?>,
+        answersReport: <?= json_encode($answersReport ?? []) ?>,
     };
 
     const unblockUrl = "<?= site_url('dashboard-hrd/unblock') ?>";
@@ -273,41 +391,124 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
         `).join('');
     }
 
-    function renderAnswers(answers) {
+    function renderAnswers(summaries) {
         const filterPegawai = document.getElementById('filterPegawai').value.toLowerCase();
-        const filterStatus = document.getElementById('filterStatus').value;
+        // filterStatus and filterTanggal might need adjustment since we now filter summaries
+        const filterStatus = document.getElementById('filterStatus').value; // This was for individual answer status, now maybe map to summary?
         const filterTanggal = document.getElementById('filterTanggal').value;
         
-        const filtered = answers.filter(a => {
-            const matchesPegawai = a.nama_pegawai.toLowerCase().includes(filterPegawai) || a.id_pegawai.toLowerCase().includes(filterPegawai);
-            const matchesStatus = filterStatus === '' || a.status_jawaban === filterStatus;
-            const matchesTanggal = filterTanggal === '' || a.tanggal_menjawab.startsWith(filterTanggal);
+        const filtered = summaries.filter(s => {
+            const matchesPegawai = s.nama_pegawai.toLowerCase().includes(filterPegawai) || s.id_pegawai.toLowerCase().includes(filterPegawai);
+            const matchesStatus = filterStatus === '' || s.status_tes === filterStatus;
+            const matchesTanggal = filterTanggal === '' || s.tanggal_tes.startsWith(filterTanggal);
             return matchesPegawai && matchesStatus && matchesTanggal;
         });
 
         if (!filtered.length) {
-            document.getElementById('answersTableBody').innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">Tidak ada data jawaban yang cocok.</td></tr>';
+            document.getElementById('answersTableBody').innerHTML = `<tr><td colspan="8" class="text-center py-4 text-muted">Tidak ada data jawaban yang cocok.</td></tr>`;
             return;
         }
 
-        document.getElementById('answersTableBody').innerHTML = filtered.map(a => `
+        document.getElementById('answersTableBody').innerHTML = filtered.map(s => `
             <tr>
                 <td>
-                    <div class="fw-bold">${escapeHtml(a.nama_pegawai)}</div>
-                    <div class="small text-muted">${escapeHtml(a.id_pegawai)}</div>
+                    <div class="fw-bold text-dark">${escapeHtml(s.nama_pegawai)}</div>
+                    <div class="small text-muted">${escapeHtml(s.id_pegawai)}</div>
                 </td>
-                <td style="max-width: 200px;"><div class="text-truncate">ID Soal: ${a.id_pertanyaan}</div></td>
-                <td><span class="badge bg-secondary">${a.jawaban_dipilih}</span></td>
-                <td><span class="badge bg-primary">${a.jawaban_benar}</span></td>
+                <td><span class="status-pill status-${s.status_tes}">${s.status_tes}</span></td>
+                <td class="text-center fw-bold text-muted">${s.total_dijawab} / ${s.total_soal}</td>
+                <td class="text-center"><span class="badge bg-success">${s.benar}</span></td>
+                <td class="text-center"><span class="badge bg-danger">${s.salah}</span></td>
+                <td class="text-center"><strong class="text-primary">${s.nilai_akhir}</strong></td>
+                <td class="text-muted small">${formatDate(s.tanggal_tes)}</td>
                 <td>
-                    <span class="status-pill ${a.status_jawaban === 'Benar' ? 'status-completed' : 'status-locked'}">
-                        ${a.status_jawaban}
-                    </span>
+                    <button class="btn btn-sm btn-secondary py-1 px-2" style="font-size:12px; min-height:0" onclick="showDetail('${s.id_pegawai}')">
+                        <i class="bi bi-eye"></i> Detail
+                    </button>
                 </td>
-                <td class="fw-bold">${a.nilai}</td>
-                <td class="text-muted small">${formatDate(a.tanggal_menjawab)}</td>
             </tr>
         `).join('');
+    }
+
+    function showDetail(idPegawai) {
+        const summary = currentAnswersData.find(s => s.id_pegawai === idPegawai);
+        if (!summary) return;
+
+        document.getElementById('modalEmployeeName').textContent = summary.nama_pegawai;
+        document.getElementById('modalEmployeeId').textContent = 'ID: ' + summary.id_pegawai;
+        document.getElementById('modalTotalSoal').textContent = summary.total_soal;
+        document.getElementById('modalTotalDijawab').textContent = summary.total_dijawab;
+        document.getElementById('modalBenar').textContent = summary.benar;
+        document.getElementById('modalSalah').textContent = summary.salah;
+        document.getElementById('modalNilai').textContent = summary.nilai_akhir;
+        document.getElementById('modalStatusTes').textContent = summary.status_tes;
+        document.getElementById('modalTanggalTes').textContent = formatDate(summary.tanggal_tes);
+
+        // Session Stats
+        for (let i = 1; i <= 3; i++) {
+            const stats = summary.session_stats['sesi_' + i];
+            const el = document.getElementById('modalSesi' + i + 'Stats');
+            if (stats && stats.total_soal > 0) {
+                el.innerHTML = `<span class="text-success">${stats.benar}</span> / ${stats.total_soal} <small class="text-muted">(${stats.nilai} pts)</small>`;
+            } else {
+                el.textContent = 'Belum Ada';
+            }
+        }
+
+        const listEl = document.getElementById('modalAnswerList');
+        listEl.innerHTML = summary.detail.map((a, index) => {
+            const isCorrect = a.status_jawaban === 'Benar';
+            
+            // Function to render choice content (text or image)
+            const renderChoice = (choiceKey) => {
+                if (!choiceKey) return '<span class="text-muted italic">Belum dijawab</span>';
+                
+                const choiceType = a['tipe_pilihan_' + choiceKey.toLowerCase()] || 'text';
+                const choiceText = a['pilihan_' + choiceKey.toLowerCase()];
+                const choiceImg = a['gambar_pilihan_' + choiceKey.toLowerCase()];
+                
+                if (choiceType === 'gambar' && choiceImg) {
+                    return `<img src="<?= base_url('uploads/questions/') ?>${choiceImg}" class="img-answer d-block" alt="Option ${choiceKey}">`;
+                }
+                return `<strong>${choiceKey}.</strong> ${escapeHtml(choiceText || '-')}`;
+            };
+
+            const statusLabel = a.status_jawaban || 'Belum dijawab';
+            const badgeClass = statusLabel === 'Benar' ? 'badge-success-alt' : (statusLabel === 'Salah' ? 'badge-danger-alt' : 'bg-warning text-dark');
+            const cardBorderClass = statusLabel === 'Benar' ? 'correct' : (statusLabel === 'Salah' ? 'wrong' : '');
+
+            return `
+                <div class="answer-card ${cardBorderClass}">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="answer-num">S${a.sesi}-Q${a.nomor_pertanyaan}</div>
+                            <span class="answer-status-badge ${badgeClass}">
+                                ${statusLabel}
+                            </span>
+                        </div>
+                        <div class="fw-bold text-muted small">Poin: ${a.nilai || 0}</div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="small fw-bold text-muted">Jawaban Pegawai:</div>
+                            <div class="p-2 bg-light rounded mt-1 border">
+                                ${renderChoice(a.jawaban_dipilih)}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small fw-bold text-muted">Jawaban Benar:</div>
+                            <div class="p-2 mt-1 border rounded" style="background: #e6f6ef; border-color: #c3e6cb !important;">
+                                ${renderChoice(a.jawaban_benar)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        const modal = new bootstrap.Modal(document.getElementById('detailModal'));
+        modal.show();
     }
 
     let currentAnswersData = [];

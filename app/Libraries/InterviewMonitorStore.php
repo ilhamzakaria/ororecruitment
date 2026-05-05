@@ -46,6 +46,7 @@ class InterviewMonitorStore
             'is_blocked'       => (bool) ($payload['blockedCandidate'] ?? ($session['is_blocked'] ?? false)),
             'last_message'     => $this->pickString($payload, 'message', (string) ($session['last_message'] ?? '')),
             'answers'          => isset($payload['answers']) ? json_encode($payload['answers']) : ($session['answers'] ?? null),
+            'current_session'  => max(1, (int) ($payload['currentSession'] ?? ($session['current_session'] ?? 1))),
             'updated_at'       => $eventAt,
         ];
 
@@ -226,46 +227,51 @@ class InterviewMonitorStore
     }
 
     /**
-     * Save answers to jawaban_pegawai table
+     * Save answers to session-specific answer table
      */
     private function saveDetailedAnswers($db, $payload, $sessionData): void
     {
         $idPegawai = $sessionData['id_user'] ?? '';
         $namaPegawai = $sessionData['candidate_name'] ?? '';
+        $currentSession = (int) ($payload['currentSession'] ?? ($sessionData['current_session'] ?? 1));
         $answers = $payload['answers'];
 
+        $qTable = "pertanyaan_sesi_$currentSession";
+        $aTable = "jawaban_sesi_$currentSession";
+
         foreach ($answers as $idPertanyaan => $jawabanDipilih) {
-            // Get correct answer from pertanyaan_tes
-            $q = $db->table('pertanyaan_tes')->where('id_pertanyaan', $idPertanyaan)->get()->getRowArray();
+            // Get correct answer from session-specific question table
+            $q = $db->table($qTable)->where('id_pertanyaan', $idPertanyaan)->get()->getRowArray();
             if (!$q) continue;
 
             $jawabanBenar = $q['jawaban_benar'];
             $statusJawaban = ($jawabanDipilih === $jawabanBenar) ? 'Benar' : 'Salah';
-            $nilai = ($statusJawaban === 'Benar') ? 10 : 0; // Example scoring
+            $nilai = ($statusJawaban === 'Benar') ? 10 : 0; 
 
             $dataJawaban = [
                 'id_pertanyaan'    => $idPertanyaan,
                 'id_pegawai'       => $idPegawai,
                 'nama_pegawai'     => $namaPegawai,
-                'jawaban_dipilih'  => $jawabanDipilih,
+                'nomor_pertanyaan' => $q['urutan_pertanyaan'],
+                'jawaban_pegawai'  => $jawabanDipilih,
                 'jawaban_benar'    => $jawabanBenar,
                 'status_jawaban'   => $statusJawaban,
                 'nilai'            => $nilai,
                 'tanggal_menjawab' => $this->nowIso(),
             ];
 
-            // Check if already answered
-            $existing = $db->table('jawaban_pegawai')
+            // Check if already answered in this session
+            $existing = $db->table($aTable)
                 ->where('id_pertanyaan', $idPertanyaan)
                 ->where('id_pegawai', $idPegawai)
                 ->get()->getRowArray();
 
             if ($existing) {
-                $db->table('jawaban_pegawai')
+                $db->table($aTable)
                     ->where('id_jawaban', $existing['id_jawaban'])
                     ->update($dataJawaban);
             } else {
-                $db->table('jawaban_pegawai')->insert($dataJawaban);
+                $db->table($aTable)->insert($dataJawaban);
             }
         }
     }

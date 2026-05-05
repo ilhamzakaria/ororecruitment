@@ -2,8 +2,8 @@
 
 namespace App\Controllers;
 
-use App\Models\QuestionModel;
-use App\Models\AnswerModel;
+use App\Models\SessionQuestionModel;
+use App\Models\SessionAnswerModel;
 use Throwable;
 
 class QuestionManagement extends BaseController
@@ -13,15 +13,17 @@ class QuestionManagement extends BaseController
 
     public function __construct()
     {
-        $this->questionModel = new QuestionModel();
-        $this->answerModel = new AnswerModel();
+        $this->questionModel = new SessionQuestionModel();
+        $this->answerModel = new SessionAnswerModel();
     }
 
-    public function index()
+    public function index($session = 1)
     {
         if (! $this->authAllows(['hrd', 'manager'])) {
             return redirect()->to(site_url('login'));
         }
+
+        $this->questionModel->setSession($session);
 
         // Auto-initialize null urutan_pertanyaan
         $nullQuestions = $this->questionModel->where('urutan_pertanyaan', null)->orWhere('urutan_pertanyaan', 0)->orderBy('id_pertanyaan', 'ASC')->findAll();
@@ -37,15 +39,17 @@ class QuestionManagement extends BaseController
             'questions' => $this->questionModel->orderBy('urutan_pertanyaan', 'ASC')->findAll(),
             'authUser'  => $this->authUser(),
             'logoutUrl' => site_url('logout'),
+            'currentSession' => $session,
         ]);
     }
 
-    public function add()
+    public function add($session = 1)
     {
         if (! $this->authAllows(['hrd', 'manager'])) {
             return redirect()->to(site_url('login'));
         }
 
+        $this->questionModel->setSession($session);
         $authUser = $this->authUser();
         
         // Get max order
@@ -68,8 +72,6 @@ class QuestionManagement extends BaseController
             'tipe_pilihan_e'   => $this->request->getPost('tipe_pilihan_e') ?: 'text',
             'jawaban_benar'    => $this->request->getPost('jawaban_benar'),
             'status_pertanyaan'=> $this->request->getPost('status_pertanyaan'),
-            'dibuat_oleh'      => $authUser['id_user'] ?? 'system',
-            'role_pembuat'     => $authUser['role'] ?? 'system',
             'tanggal_dibuat'   => date('Y-m-d H:i:s'),
         ];
 
@@ -80,11 +82,9 @@ class QuestionManagement extends BaseController
         foreach (['a', 'b', 'c', 'd', 'e'] as $o) {
             $type = $data["tipe_pilihan_$o"];
             $imgField = "gambar_pilihan_$o";
-            $textField = "pilihan_$o";
             
             if ($type === 'gambar') {
                 $data[$imgField] = $this->handleUpload($imgField);
-                // In add mode, if type is image, text is usually empty or ignored
             } else {
                 $data[$imgField] = null;
             }
@@ -98,12 +98,13 @@ class QuestionManagement extends BaseController
         }
     }
 
-    public function update()
+    public function update($session = 1)
     {
         if (! $this->authAllows(['hrd', 'manager'])) {
             return redirect()->to(site_url('login'));
         }
 
+        $this->questionModel->setSession($session);
         $id = $this->request->getPost('id_pertanyaan');
         
         $data = [
@@ -137,9 +138,7 @@ class QuestionManagement extends BaseController
                 if ($img = $this->handleUpload($imgField)) {
                     $data[$imgField] = $img;
                 }
-                // If it's already 'gambar' and no new upload, keep existing (implicitly handled by not including in $data if null)
             } else {
-                // If user switched to text, clear the image path
                 $data[$imgField] = null;
             }
         }
@@ -152,12 +151,13 @@ class QuestionManagement extends BaseController
         }
     }
 
-    public function delete()
+    public function delete($session = 1)
     {
         if (! $this->authAllows(['hrd', 'manager'])) {
             return $this->response->setStatusCode(403)->setJSON(['ok' => false, 'message' => 'Forbidden']);
         }
 
+        $this->questionModel->setSession($session);
         $id = $this->request->getPost('id');
         try {
             $question = $this->questionModel->find($id);
@@ -176,12 +176,13 @@ class QuestionManagement extends BaseController
         }
     }
 
-    public function reorder()
+    public function reorder($session = 1)
     {
         if (! $this->authAllows(['hrd', 'manager'])) {
             return $this->response->setStatusCode(403)->setJSON(['ok' => false, 'message' => 'Forbidden']);
         }
 
+        $this->questionModel->setSession($session);
         $id = $this->request->getPost('id');
         $direction = $this->request->getPost('direction'); // 'up', 'down', or numeric target
         
@@ -233,12 +234,13 @@ class QuestionManagement extends BaseController
         }
     }
 
-    public function toggleStatus()
+    public function toggleStatus($session = 1)
     {
         if (! $this->authAllows(['hrd', 'manager'])) {
             return $this->response->setStatusCode(403)->setJSON(['ok' => false, 'message' => 'Forbidden']);
         }
 
+        $this->questionModel->setSession($session);
         $id = $this->request->getPost('id');
         $status = $this->request->getPost('status');
         try {

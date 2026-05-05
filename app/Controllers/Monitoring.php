@@ -29,6 +29,7 @@ class Monitoring extends BaseController
             'summary' => $dashboard['summary'],
             'sessions' => $dashboard['sessions'],
             'recentViolations' => $dashboard['recentViolations'],
+            'answersReport' => $this->getAnswersReport(),
             'updatedAt' => $dashboard['updatedAt'],
             'dashboardDataUrl' => site_url('dashboard-hrd/data'),
             'interviewUrl' => site_url('tes-interview'),
@@ -57,10 +58,112 @@ class Monitoring extends BaseController
     private function getAnswersReport()
     {
         $db = \Config\Database::connect();
-        return $db->table('jawaban_pegawai')
-            ->orderBy('tanggal_menjawab', 'DESC')
-            ->get()
-            ->getResultArray();
+        
+        // We need to find all employees across all 3 session answer tables
+        $allPegawai = [];
+        for ($i = 1; $i <= 3; $i++) {
+            $emps = $db->table("jawaban_sesi_$i")
+                ->select('id_pegawai, nama_pegawai, MAX(tanggal_menjawab) as terakhir')
+                ->groupBy('id_pegawai, nama_pegawai')
+                ->get()
+                ->getResultArray();
+            
+            foreach ($emps as $e) {
+                $id = $e['id_pegawai'];
+                if (!isset($allPegawai[$id])) {
+                    $allPegawai[$id] = $e;
+                } else {
+                    if ($e['terakhir'] > $allPegawai[$id]['terakhir']) {
+                        $allPegawai[$id]['terakhir'] = $e['terakhir'];
+                    }
+                }
+            }
+        }
+
+        // Sort by latest activity
+        uasort($allPegawai, function($a, $b) {
+            return strcmp($b['terakhir'], $a['terakhir']);
+        });
+
+        $report = [];
+        foreach ($allPegawai as $emp) {
+            $id = $emp['id_pegawai'];
+            
+            $totalSoalAll = 0;
+            $totalDijawabAll = 0;
+            $benarAll = 0;
+            $salahAll = 0;
+            $nilaiAkhirAll = 0;
+            $allDetails = [];
+            $sessionStats = [];
+
+            for ($i = 1; $i <= 3; $i++) {
+                $qTable = "pertanyaan_sesi_$i";
+                $aTable = "jawaban_sesi_$i";
+
+                $totalSoalSesi = $db->table($qTable)->where('status_pertanyaan', 'Aktif')->countAllResults();
+                $answersSesi = $db->table("$aTable as j")
+                    ->select('j.*, p.isi_pertanyaan, p.tipe_pertanyaan, p.gambar_pertanyaan, 
+                             p.pilihan_a, p.pilihan_b, p.pilihan_c, p.pilihan_d, p.pilihan_e,
+                             p.gambar_pilihan_a, p.gambar_pilihan_b, p.gambar_pilihan_c, p.gambar_pilihan_d, p.gambar_pilihan_e,
+                             p.tipe_pilihan_a, p.tipe_pilihan_b, p.tipe_pilihan_c, p.tipe_pilihan_d, p.tipe_pilihan_e')
+                    ->join("$qTable as p", 'p.id_pertanyaan = j.id_pertanyaan', 'left')
+                    ->where('j.id_pegawai', $id)
+                    ->orderBy('j.nomor_pertanyaan', 'ASC')
+                    ->get()
+                    ->getResultArray();
+
+                $benarSesi = 0;
+                $nilaiSesi = 0;
+                foreach ($answersSesi as &$a) {
+                    $a['sesi'] = $i; // add session info to detail
+                    if ($a['status_jawaban'] === 'Benar') {
+                        $benarSesi++;
+                    }
+                    $nilaiSesi += $a['nilai'];
+                }
+
+                $sessionStats["sesi_$i"] = [
+                    'total_soal' => $totalSoalSesi,
+                    'terjawab' => count($answersSesi),
+                    'benar' => $benarSesi,
+                    'salah' => count($answersSesi) - $benarSesi,
+                    'nilai' => $nilaiSesi
+                ];
+
+                $totalSoalAll += $totalSoalSesi;
+                $totalDijawabAll += count($answersSesi);
+                $benarAll += $benarSesi;
+                $salahAll += (count($answersSesi) - $benarSesi);
+                $nilaiAkhirAll += $nilaiSesi;
+                $allDetails = array_merge($allDetails, $answersSesi);
+            }
+
+            // Get latest status from peserta table
+            $peserta = $db->table('peserta')
+                ->where('id_user', $id)
+                ->orderBy('updated_at', 'DESC')
+                ->limit(1)
+                ->get()
+                ->getRowArray();
+
+            $report[] = [
+                'id_pegawai' => $id,
+                'nama_pegawai' => $emp['nama_pegawai'],
+                'tanggal_tes' => $emp['terakhir'],
+                'total_soal' => $totalSoalAll,
+                'total_dijawab' => $totalDijawabAll,
+                'benar' => $benarAll,
+                'salah' => $salahAll,
+                'nilai_akhir' => $nilaiAkhirAll,
+                'status_tes' => $peserta['status'] ?? 'Selesai',
+                'current_session' => $peserta['current_session'] ?? 1,
+                'session_stats' => $sessionStats,
+                'detail' => $allDetails
+            ];
+        }
+
+        return $report;
     }
 
     public function recordEvent()
