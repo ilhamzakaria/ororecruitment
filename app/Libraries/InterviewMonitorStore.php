@@ -71,6 +71,15 @@ class InterviewMonitorStore
             $data['status'] = 'time_up';
         }
 
+        if (in_array($eventType, ['session_completed', 'session_time_up'], true)) {
+            $startedAt = $session['started_at'] ?? $data['started_at'] ?? null;
+            if ($startedAt) {
+                $start = strtotime($startedAt);
+                $end = strtotime($eventAt);
+                $data['durasi_total_detik'] = $end - $start;
+            }
+        }
+
         if ($session) {
             $db->table('peserta')->where('session_id', $sessionId)->update($data);
         } else {
@@ -90,6 +99,64 @@ class InterviewMonitorStore
                 'message'     => trim((string) ($payload['message'] ?? 'Pelanggaran terdeteksi.')),
                 'occurred_at' => $eventAt,
             ]);
+
+            // Also insert into log_pelanggaran for dashboard
+            $db->table('log_pelanggaran')->insert([
+                'id_pegawai'         => $data['id_user'],
+                'nama_pegawai'       => $data['candidate_name'],
+                'kode_pegawai'       => $data['session_code'],
+                'jenis_pelanggaran'  => trim((string) ($payload['violationType'] ?? 'general')),
+                'jumlah_pelanggaran' => $data['violations_count'],
+                'status_sesi'        => $data['status'],
+                'tanggal_pelanggaran'=> $eventAt,
+            ]);
+        }
+
+        // --- UPDATE status_sesi_peserta ---
+        $idPegawai = $data['id_user'];
+        $numSesi = $data['current_session'];
+        
+        $statusUpdate = [
+            'waktu_sisa' => max(0, (int) ($payload['timeLeftSeconds'] ?? 0)),
+        ];
+
+        if ($eventType === 'session_started') {
+            $statusUpdate['status_sesi'] = 'berjalan';
+            $statusUpdate['waktu_mulai'] = $eventAt;
+        }
+
+        if ($eventType === 'session_completed') {
+            $statusUpdate['status_sesi'] = 'selesai';
+            $statusUpdate['tanggal_selesai'] = $eventAt;
+            $statusUpdate['waktu_sisa'] = 0;
+        }
+
+        if ($eventType === 'session_time_up') {
+            $statusUpdate['status_sesi'] = 'selesai';
+            $statusUpdate['tanggal_selesai'] = $eventAt;
+            $statusUpdate['waktu_sisa'] = 0;
+        }
+
+        if ($idPegawai && $numSesi) {
+            $exists = $db->table('status_sesi_peserta')
+                ->where('id_pegawai', $idPegawai)
+                ->where('nomor_sesi', $numSesi)
+                ->get()->getRowArray();
+            
+            if ($exists) {
+                $db->table('status_sesi_peserta')
+                    ->where('id_status', $exists['id_status'])
+                    ->update($statusUpdate);
+            } else {
+                $statusUpdate['id_pegawai'] = $idPegawai;
+                $statusUpdate['nomor_sesi'] = $numSesi;
+                
+                // Get duration from pengaturan_sesi
+                $sessionSetting = $db->table('pengaturan_sesi')->where('id_sesi', $numSesi)->get()->getRowArray();
+                $statusUpdate['durasi_menit'] = (int) ($sessionSetting['durasi_menit'] ?? 10);
+                
+                $db->table('status_sesi_peserta')->insert($statusUpdate);
+            }
         }
 
         return $db->table('peserta')->where('session_id', $sessionId)->get()->getRowArray() ?? [];
@@ -111,11 +178,8 @@ class InterviewMonitorStore
                 ->get()
                 ->getResultArray();
 
-            $violations = $db->table('pelanggaran')
-                ->select('pelanggaran.*, peserta.candidate_name, peserta.id_user, peserta.position_name, peserta.hrd_name, peserta.session_code')
-                ->join('peserta', 'peserta.session_id = pelanggaran.session_id')
-                ->orderBy('occurred_at', 'DESC')
-                ->limit(30)
+            $violations = $db->table('log_pelanggaran')
+                ->orderBy('tanggal_pelanggaran', 'DESC')
                 ->get()
                 ->getResultArray();
 
@@ -148,19 +212,21 @@ class InterviewMonitorStore
                         'blockedCandidate' => (bool) $s['is_blocked'],
                         'lastMessage'      => $s['last_message'],
                         'answers'          => $s['answers'] ? json_decode($s['answers'], true) : [],
+                        'startedAt'        => $s['started_at'],
+                        'testDuration'     => (int) $s['test_duration'],
                         'updatedAt'        => $s['updated_at'],
                     ];
                 }, $sessions),
                 'recentViolations' => array_map(function($v) {
                     return [
-                        'at'            => $v['occurred_at'],
-                        'type'          => $v['type'],
-                        'message'       => $v['message'],
-                        'candidateName' => $v['candidate_name'],
-                        'idUser'        => $v['id_user'],
-                        'positionName'  => $v['position_name'],
-                        'hrdName'       => $v['hrd_name'],
-                        'sessionCode'   => $v['session_code'],
+                        'idLog'             => $v['id_log'],
+                        'at'                => $v['tanggal_pelanggaran'],
+                        'type'              => $v['jenis_pelanggaran'],
+                        'count'             => (int) $v['jumlah_pelanggaran'],
+                        'status'            => $v['status_sesi'],
+                        'candidateName'     => $v['nama_pegawai'],
+                        'idUser'            => $v['id_pegawai'],
+                        'sessionCode'       => $v['kode_pegawai'],
                     ];
                 }, $violations),
                 'updatedAt' => $this->nowIso(),

@@ -486,6 +486,77 @@ $headerSubtitle = 'Sesi Tes Aptitude';
     .custom-alert-btn:hover {
         opacity: 0.85;
     }
+
+    .session-tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 24px;
+        border-bottom: 2px solid var(--line);
+        padding-bottom: 0;
+    }
+
+    .session-tab {
+        padding: 12px 24px;
+        border-radius: 12px 12px 0 0;
+        border: 1px solid transparent;
+        cursor: pointer;
+        font-weight: 800;
+        color: var(--muted);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 14px;
+        background: var(--soft);
+        margin-bottom: -2px;
+        border: 1px solid var(--line);
+        border-bottom: 0;
+    }
+
+    .session-tab:hover {
+        background: #fff;
+        color: var(--green-1);
+    }
+
+    .session-tab.active {
+        background: #fff;
+        color: var(--green-1);
+        border-top: 3px solid var(--green-1);
+        border-bottom: 2px solid #fff;
+        z-index: 2;
+    }
+
+    .tab-badge {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--line);
+        color: var(--muted);
+        font-weight: 800;
+    }
+
+    .session-tab.active .tab-badge {
+        background: var(--green-1);
+        color: #fff;
+    }
+
+    .session-tab.locked {
+        opacity: 0.6;
+        cursor: not-allowed;
+        background: #f8f9fa;
+        color: #adb5bd;
+        border-color: #e9ecef;
+    }
+
+    .session-tab.locked:hover {
+        background: #f8f9fa;
+        color: #adb5bd;
+    }
+
+    .session-tab.locked .tab-badge {
+        background: #e9ecef;
+        color: #adb5bd;
+    }
 </style>
 <?= $this->endSection() ?>
 
@@ -579,6 +650,17 @@ $headerSubtitle = 'Sesi Tes Aptitude';
 
     <section class="state question-state" id="questionState">
         <div class="question-card">
+            <div class="session-tabs">
+                <div class="session-tab active" data-session="1" id="tabSesi1">
+                    Sesi 1 <span class="tab-badge" id="badgeSesi1">0/0</span>
+                </div>
+                <div class="session-tab" data-session="2" id="tabSesi2">
+                    Sesi 2 <span class="tab-badge" id="badgeSesi2">0/0</span>
+                </div>
+                <div class="session-tab" data-session="3" id="tabSesi3">
+                    Sesi 3 <span class="tab-badge" id="badgeSesi3">0/0</span>
+                </div>
+            </div>
             <div class="question-head">
                 <div>
                     <span class="pill mb-2" id="questionCategory">Tes Aptitude - Sesi <?= $currentSession ?></span>
@@ -712,15 +794,16 @@ $headerSubtitle = 'Sesi Tes Aptitude';
             </div>
         </div>
     </div>
-</div>
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
 <script>
-    const interviewData = <?= json_encode($questions, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+    const allQuestions = <?= json_encode($allQuestions, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+    const allAnswers = <?= json_encode($allAnswers, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+    
     const interviewState = {
         current: 0,
-        answers: {},
+        allAnswers: allAnswers,
         startTime: Date.now(),
         violations: 0,
         maxViolations: <?= $maxViolations ?>,
@@ -733,6 +816,9 @@ $headerSubtitle = 'Sesi Tes Aptitude';
         sessionCode: '',
         isStarted: false,
         currentSession: <?= $currentSession ?>,
+        timeLeftSeconds: <?= (int)$timeLeftSeconds ?>,
+        isSubmittingFinal: false,
+        isTestCompleted: false,
     };
 
     const existingSession = <?= json_encode($existingSession ?? null, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
@@ -747,17 +833,13 @@ $headerSubtitle = 'Sesi Tes Aptitude';
         if (existingSession.current_question) {
             interviewState.current = parseInt(existingSession.current_question || 0, 10);
         }
-        if (existingSession.answers) {
-            try {
-                interviewState.answers = JSON.parse(existingSession.answers) || {};
-            } catch (e) {}
+        if (existingSession.started_at) {
+            interviewState.isStarted = true;
+        }
+        if (existingSession.status === 'completed' || existingSession.status === 'time_up') {
+            interviewState.isTestCompleted = true;
         }
     }
-
-    interviewState.current = Math.min(
-        Math.max(interviewState.current, 0),
-        Math.max(interviewData.length - 1, 0)
-    );
 
     const el = {
         introState: document.getElementById('introState'),
@@ -793,6 +875,7 @@ $headerSubtitle = 'Sesi Tes Aptitude';
         positionNameInp: document.getElementById('positionName'),
         hrdNameInp: document.getElementById('hrdName'),
         sessionCodeInp: document.getElementById('sessionCode'),
+        tabs: document.querySelectorAll('.session-tab'),
     };
 
     function showCustomAlert(msg, title = 'Akses Ditolak', icon = 'bi-exclamation-circle-fill', btnText = 'Mengerti', callback = null) {
@@ -807,15 +890,13 @@ $headerSubtitle = 'Sesi Tes Aptitude';
         btnEl.textContent = btnText;
         iconEl.innerHTML = `<i class="bi ${icon}"></i>`;
         
-        // Change icon color based on title or icon type if needed
         if (title.toLowerCase().includes('selesai') || title.toLowerCase().includes('sukses')) {
             iconEl.style.color = 'var(--green-1)';
         } else {
-            iconEl.style.color = '#f5a623'; // Default orange
+            iconEl.style.color = '#f5a623';
         }
 
         overlay.style.display = 'flex';
-
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
                 overlay.classList.add('active');
@@ -831,9 +912,52 @@ $headerSubtitle = 'Sesi Tes Aptitude';
         };
     }
 
+    function startTimer() {
+        if (window.timerInterval) clearInterval(window.timerInterval);
+        if (interviewState.isTestCompleted) return; // Don't start if completed
+        
+        window.timerInterval = setInterval(() => {
+            if (!interviewState.isStarted || interviewState.isLocked || interviewState.isTestCompleted) {
+                clearInterval(window.timerInterval);
+                return;
+            }
+
+            if (interviewState.timeLeftSeconds <= 0) {
+                clearInterval(window.timerInterval);
+                handleTimeUp();
+                return;
+            }
+
+            interviewState.timeLeftSeconds--;
+            if (interviewState.timeLeftSeconds % 30 === 0) {
+                syncSession('timer_sync');
+            }
+            updateTimerDisplay();
+        }, 1000);
+    }
+
+    function updateTimerDisplay() {
+        const m = Math.floor(Math.max(0, interviewState.timeLeftSeconds) / 60);
+        const s = Math.max(0, interviewState.timeLeftSeconds) % 60;
+        const display = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        if (el.durationMetric) el.durationMetric.textContent = display;
+    }
+
+    function handleTimeUp() {
+        showCustomAlert("Waktu pengerjaan tes telah habis. Sesi Anda telah berakhir.", "Waktu Habis", "bi-alarm-fill", "Tutup", () => {
+             el.questionState.classList.remove('active');
+             el.summaryState.classList.add('active');
+             if (document.fullscreenElement) document.exitFullscreen();
+             syncSession('session_time_up');
+        });
+    }
+
     function updateMetrics() {
-        const total = interviewData.length;
-        const answered = Object.keys(interviewState.answers).length;
+        const currentData = allQuestions[interviewState.currentSession] || [];
+        const currentAnswers = interviewState.allAnswers[interviewState.currentSession] || {};
+        
+        const total = currentData.length;
+        const answered = Object.keys(currentAnswers).length;
         const pct = total > 0 ? Math.round((answered / total) * 100) : 0;
 
         if (el.progressFill) el.progressFill.style.width = pct + '%';
@@ -842,6 +966,34 @@ $headerSubtitle = 'Sesi Tes Aptitude';
         if (el.answeredMetric) el.answeredMetric.textContent = `${answered} dari ${total} soal telah dijawab`;
         if (el.questionCountMetric) el.questionCountMetric.textContent = total;
 
+        // Validation logic for tabs
+        const sessionCompleted = {
+            1: (allQuestions[1] && allQuestions[1].length > 0 && Object.keys(interviewState.allAnswers[1] || {}).length === allQuestions[1].length),
+            2: (allQuestions[2] && allQuestions[2].length > 0 && Object.keys(interviewState.allAnswers[2] || {}).length === allQuestions[2].length),
+            3: (allQuestions[3] && allQuestions[3].length > 0 && Object.keys(interviewState.allAnswers[3] || {}).length === allQuestions[3].length)
+        };
+
+        [1, 2, 3].forEach(s => {
+            const sTotal = allQuestions[s] ? allQuestions[s].length : 0;
+            const sAnswered = interviewState.allAnswers[s] ? Object.keys(interviewState.allAnswers[s]).length : 0;
+            const badge = document.getElementById(`badgeSesi${s}`);
+            const tab = document.getElementById(`tabSesi${s}`);
+            
+            let isLocked = false;
+            if (s === 2 && !sessionCompleted[1]) isLocked = true;
+            if (s === 3 && (!sessionCompleted[1] || !sessionCompleted[2])) isLocked = true;
+
+            if (badge && tab) {
+                if (isLocked) {
+                    badge.textContent = 'Terkunci';
+                    tab.classList.add('locked');
+                } else {
+                    badge.textContent = `${sAnswered}/${sTotal}`;
+                    tab.classList.remove('locked');
+                }
+            }
+        });
+
         const violationText = interviewState.tabSwitches > 0
             ? interviewState.violations + ' / ' + interviewState.maxViolations + ' | Tab ' + interviewState.tabSwitches + ' / ' + interviewState.tabSwitchLimit
             : interviewState.violations + ' / ' + interviewState.maxViolations;
@@ -849,8 +1001,59 @@ $headerSubtitle = 'Sesi Tes Aptitude';
         if (el.violationMetric) el.violationMetric.textContent = violationText;
     }
 
+    function switchSession(session) {
+        // Validation access
+        if (session === 2) {
+            const s1Total = allQuestions[1] ? allQuestions[1].length : 0;
+            const s1Answered = interviewState.allAnswers[1] ? Object.keys(interviewState.allAnswers[1]).length : 0;
+            if (s1Answered < s1Total) {
+                showCustomAlert("Selesaikan semua soal pada sesi sebelumnya terlebih dahulu sebelum melanjutkan.", "Sesi Terkunci");
+                return;
+            }
+        }
+        if (session === 3) {
+            const s1Total = allQuestions[1] ? allQuestions[1].length : 0;
+            const s1Answered = interviewState.allAnswers[1] ? Object.keys(interviewState.allAnswers[1]).length : 0;
+            const s2Total = allQuestions[2] ? allQuestions[2].length : 0;
+            const s2Answered = interviewState.allAnswers[2] ? Object.keys(interviewState.allAnswers[2]).length : 0;
+            if (s1Answered < s1Total || s2Answered < s2Total) {
+                showCustomAlert("Selesaikan semua soal pada sesi sebelumnya terlebih dahulu sebelum melanjutkan.", "Sesi Terkunci");
+                return;
+            }
+        }
+
+        interviewState.currentSession = session;
+        interviewState.current = 0;
+        
+        // Reset timer for new session if it's a different session and not already started
+        const sessionTotalSeconds = (<?= (int)$durationMinutes ?>) * 60; // Default fallback
+        // We'll update the timeLeftSeconds from the server if it's the current session
+        // For other sessions, we'll fetch from server later or just render.
+        // Actually, the page reloads or syncs when switching session via finishBtn.
+        
+        el.tabs.forEach(tab => {
+            if (parseInt(tab.dataset.session) === session) {
+                tab.classList.add('active');
+            } else {
+                tab.classList.remove('active');
+            }
+        });
+
+        renderQuestion();
+    }
+
+    el.tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const session = parseInt(tab.dataset.session);
+            if (session !== interviewState.currentSession) {
+                switchSession(session);
+            }
+        });
+    });
+
     function renderOptions(question) {
-        const selected = interviewState.answers[question.id] || '';
+        const currentAnswers = interviewState.allAnswers[interviewState.currentSession] || {};
+        const selected = currentAnswers[question.id] || '';
         el.answerOptions.innerHTML = '';
 
         question.options.forEach((option) => {
@@ -887,17 +1090,13 @@ $headerSubtitle = 'Sesi Tes Aptitude';
                 text.classList.add('compact');
             }
 
-            if (text.textContent !== '') {
-                content.appendChild(text);
-            }
+            if (text.textContent !== '') content.appendChild(text);
 
             wrapper.appendChild(badge);
             wrapper.appendChild(input);
             wrapper.appendChild(content);
 
-            if (input.checked) {
-                wrapper.classList.add('active');
-            }
+            if (input.checked) wrapper.classList.add('active');
 
             input.addEventListener('change', () => {
                 el.answerOptions.querySelectorAll('.option-card').forEach((card) => card.classList.remove('active'));
@@ -910,16 +1109,20 @@ $headerSubtitle = 'Sesi Tes Aptitude';
     }
 
     function renderQuestion() {
-        const question = interviewData[interviewState.current];
+        const currentData = allQuestions[interviewState.currentSession] || [];
+        const question = currentData[interviewState.current];
         if (!question) {
+            el.questionTitle.textContent = "Tidak ada soal";
+            el.questionText.textContent = "Belum ada soal tersedia untuk sesi ini.";
+            el.answerOptions.innerHTML = "";
             return;
         }
 
         el.questionTitle.textContent = `Soal ${question.number}`;
         el.questionText.textContent = question.prompt;
-        el.questionCategory.textContent = 'Tes Aptitude';
-        el.questionInstruction.textContent = `Pilih satu jawaban yang paling tepat. Progress soal ${question.number} dari ${interviewData.length}.`;
-        el.questionIndex.textContent = `Soal ${question.number} / ${interviewData.length}`;
+        el.questionCategory.textContent = `Tes Aptitude - Sesi ${interviewState.currentSession}`;
+        el.questionInstruction.textContent = `Pilih satu jawaban yang paling tepat. Progress soal ${question.number} dari ${currentData.length}.`;
+        el.questionIndex.textContent = `Soal ${question.number} / ${currentData.length}`;
 
         if (question.promptImageUrl) {
             el.questionPromptImage.src = question.promptImageUrl;
@@ -932,30 +1135,53 @@ $headerSubtitle = 'Sesi Tes Aptitude';
         renderOptions(question);
 
         el.prevBtn.style.display = interviewState.current === 0 ? 'none' : 'block';
-        el.nextBtn.style.display = interviewState.current === interviewData.length - 1 ? 'none' : 'block';
-        el.finishBtn.style.display = interviewState.current === interviewData.length - 1 ? 'block' : 'none';
+        el.nextBtn.style.display = interviewState.current === currentData.length - 1 ? 'none' : 'block';
+        el.finishBtn.style.display = interviewState.current === currentData.length - 1 ? 'block' : 'none';
         updateMetrics();
     }
 
-    function saveCurrentAnswer() {
-        const question = interviewData[interviewState.current];
-        if (!question) {
-            return;
-        }
+    async function saveCurrentAnswer() {
+        const currentData = allQuestions[interviewState.currentSession] || [];
+        const question = currentData[interviewState.current];
+        if (!question) return;
 
         const checked = document.querySelector('input[name="answerOption"]:checked');
-        if (checked) {
-            interviewState.answers[question.id] = checked.value;
+        const val = checked ? checked.value : null;
+
+        if (val) {
+            if (!interviewState.allAnswers[interviewState.currentSession]) {
+                interviewState.allAnswers[interviewState.currentSession] = {};
+            }
+            interviewState.allAnswers[interviewState.currentSession][question.id] = val;
         } else {
-            delete interviewState.answers[question.id];
+            if (interviewState.allAnswers[interviewState.currentSession]) {
+                delete interviewState.allAnswers[interviewState.currentSession][question.id];
+            }
         }
 
         updateMetrics();
+        
+        try {
+            await fetch("<?= esc($saveAnswerUrl) ?>", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session: interviewState.currentSession,
+                    idPegawai: interviewState.sessionCode || el.sessionCodeInp.value.trim(),
+                    namaPegawai: interviewState.candidateName || el.candidateNameInp.value.trim(),
+                    idPertanyaan: question.id,
+                    nomorPertanyaan: question.number,
+                    jawabanPegawai: val
+                })
+            });
+        } catch (e) {}
+
         syncSession('answer_updated');
     }
 
     async function syncSession(eventType, msg = '') {
         const sessionIdVal = el.sessionCodeInp.value.trim() || 'SESI-<?= esc($authUser['id_user'] ?? uniqid()) ?>';
+        const currentAnswers = interviewState.allAnswers[interviewState.currentSession] || {};
 
         try {
             await fetch("<?= esc($monitorEventUrl) ?>", {
@@ -970,22 +1196,22 @@ $headerSubtitle = 'Sesi Tes Aptitude';
                     hrdName: interviewState.hrdName || el.hrdNameInp.value.trim(),
                     sessionCode: interviewState.sessionCode || el.sessionCodeInp.value.trim(),
                     current_question: interviewState.current,
-                    questionsTotal: interviewData.length,
+                    questionsTotal: (allQuestions[interviewState.currentSession] || []).length,
                     violations: interviewState.violations,
                     tabSwitches: interviewState.tabSwitches,
                     blockedCandidate: interviewState.isLocked,
                     message: msg,
                     violationType: eventType === 'violation_detected' ? 'security_breach' : '',
-                    answers: interviewState.answers,
-                    currentSession: interviewState.currentSession
+                    answers: currentAnswers,
+                    currentSession: interviewState.currentSession,
+                    timeLeftSeconds: interviewState.timeLeftSeconds
                 })
             });
         } catch (e) {}
     }
 
     async function registerSecurityViolation(type, msg) {
-        if (interviewState.isLocked || !interviewState.isStarted) return;
-
+        if (interviewState.isLocked || !interviewState.isStarted || interviewState.isSubmittingFinal || interviewState.isTestCompleted) return;
         if (type === 'tab') interviewState.tabSwitches++;
         else interviewState.violations++;
 
@@ -1053,9 +1279,10 @@ $headerSubtitle = 'Sesi Tes Aptitude';
         el.candidateBadge.textContent = name;
         el.introState.classList.remove('active');
         el.questionState.classList.add('active');
-        renderQuestion();
-
+        
+        switchSession(interviewState.currentSession);
         syncSession('session_started');
+        startTimer();
 
         document.documentElement.requestFullscreen().catch(() => {
             showCustomAlert('Gagal masuk mode fullscreen. Mohon gunakan browser terbaru dan berikan izin.', 'Fullscreen Gagal');
@@ -1069,78 +1296,93 @@ $headerSubtitle = 'Sesi Tes Aptitude';
             interviewState.isStarted = false;
             el.introState.classList.remove('active');
             el.questionState.classList.add('active');
-            renderQuestion();
+            switchSession(1);
         });
     }
 
     el.nextBtn.addEventListener('click', () => {
         saveCurrentAnswer();
-        interviewState.current++;
-        renderQuestion();
+        const currentData = allQuestions[interviewState.currentSession] || [];
+        if (interviewState.current < currentData.length - 1) {
+            interviewState.current++;
+            renderQuestion();
+        }
     });
 
     el.prevBtn.addEventListener('click', () => {
         saveCurrentAnswer();
-        interviewState.current--;
-        renderQuestion();
+        if (interviewState.current > 0) {
+            interviewState.current--;
+            renderQuestion();
+        }
     });
 
     el.finishBtn.addEventListener('click', async () => {
         saveCurrentAnswer();
         
+        const currentData = allQuestions[interviewState.currentSession] || [];
+        const currentAnswers = interviewState.allAnswers[interviewState.currentSession] || {};
+        if (Object.keys(currentAnswers).length < currentData.length) {
+            showCustomAlert("Mohon selesaikan semua soal pada sesi ini sebelum melanjutkan.", "Soal Belum Lengkap");
+            return;
+        }
+
         el.finishBtn.disabled = true;
         el.finishBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Menyimpan...';
 
-        const res = await fetch("<?= esc($completeSessionUrl) ?>", {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                sessionId: el.sessionCodeInp.value.trim() || 'SESI-<?= esc($authUser['id_user'] ?? uniqid()) ?>',
-                currentSession: interviewState.currentSession
-            })
-        });
-        const result = await res.json();
-        
-        if (result.ok) {
-            if (result.next) {
-                // Go to next session
-                showCustomAlert(
-                    'Anda akan melanjutkan ke Sesi ' + result.session + '. Pastikan Anda siap sebelum melanjutkan.',
-                    'Sesi ' + interviewState.currentSession + ' Selesai',
-                    'bi-check-circle-fill',
-                    'Lanjut ke Sesi ' + result.session,
-                    () => {
-                        location.reload();
-                    }
-                );
+        try {
+            const res = await fetch("<?= esc($completeSessionUrl) ?>", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionId: el.sessionCodeInp.value.trim() || 'SESI-<?= esc($authUser['id_user'] ?? uniqid()) ?>',
+                    currentSession: interviewState.currentSession
+                })
+            });
+            const result = await res.json();
+            
+            if (result.ok) {
+                if (result.next) {
+                    showCustomAlert(
+                        'Anda akan melanjutkan ke Sesi ' + result.session + '. Pastikan Anda siap sebelum melanjutkan.',
+                        'Sesi ' + interviewState.currentSession + ' Selesai',
+                        'bi-check-circle-fill',
+                        'Lanjut ke Sesi ' + result.session,
+                        () => {
+                            location.reload(); // Reload to get new questions and timer
+                        }
+                    );
+                } else {
+                    interviewState.isSubmittingFinal = true;
+                    interviewState.isTestCompleted = true;
+                    
+                    if (window.timerInterval) clearInterval(window.timerInterval);
+                    
+                    const summary = result.summary;
+                    document.getElementById('summaryTotal').textContent = summary.totalQuestions;
+                    document.getElementById('summaryAnswered').textContent = summary.totalAnswered;
+                    document.getElementById('summaryDuration').textContent = summary.durationText;
+                    document.getElementById('summaryViolations').textContent = summary.violations;
+                    
+                    el.questionState.classList.remove('active');
+                    el.summaryState.classList.add('active');
+                    if (document.fullscreenElement) document.exitFullscreen();
+                    syncSession('session_completed');
+                }
             } else {
-                // All sessions completed
-                const total = interviewData.length;
-                const answered = Object.keys(interviewState.answers).length;
-                const duration = Math.round((Date.now() - interviewState.startTime) / 60000);
-
-                document.getElementById('summaryTotal').textContent = total;
-                document.getElementById('summaryAnswered').textContent = answered;
-                document.getElementById('summaryDuration').textContent = duration + 'm';
-                document.getElementById('summaryViolations').textContent = interviewState.violations;
-
-                el.questionState.classList.remove('active');
-                el.summaryState.classList.add('active');
-                if (document.fullscreenElement) document.exitFullscreen();
-
-                syncSession('session_completed');
+                showCustomAlert('Gagal menyelesaikan sesi: ' + (result.message || 'Error unknown'), 'Gagal Menyimpan');
+                el.finishBtn.disabled = false;
+                el.finishBtn.innerHTML = '<i class="bi bi-check-all"></i> Selesaikan Tes';
             }
-        } else {
-            showCustomAlert('Gagal menyelesaikan sesi: ' + (result.message || 'Error unknown'), 'Gagal Menyimpan');
+        } catch (e) {
+            showCustomAlert('Terjadi kesalahan jaringan.', 'Error');
             el.finishBtn.disabled = false;
             el.finishBtn.innerHTML = '<i class="bi bi-check-all"></i> Selesaikan Tes';
         }
     });
 
     el.returnBtn.addEventListener('click', () => {
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen();
-        }
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen();
         el.violationPanel.classList.remove('active');
     });
 
@@ -1156,7 +1398,18 @@ $headerSubtitle = 'Sesi Tes Aptitude';
         }
     });
 
-    updateMetrics();
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden' && !interviewState.isLocked && interviewState.isStarted) {
+            registerSecurityViolation('tab', 'Peserta terdeteksi meninggalkan halaman tes.');
+        }
+    });
+
+    window.addEventListener('beforeunload', (e) => {
+        if (interviewState.isStarted && !interviewState.isTestCompleted && !interviewState.isLocked) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
 
     if (existingSession) {
         if (existingSession.candidate_name) el.candidateNameInp.value = existingSession.candidate_name;
@@ -1172,6 +1425,39 @@ $headerSubtitle = 'Sesi Tes Aptitude';
             el.startBtn.disabled = true;
             document.getElementById('introStatus').innerHTML = '<span class="text-danger fw-bold">Peserta ini sudah terblokir karena pelanggaran. Silakan konfirmasi ke Manager/HRD.</span>';
         }
+    }
+    
+    updateMetrics();
+    updateTimerDisplay();
+
+    if (interviewState.isTestCompleted) {
+        el.introState.classList.remove('active');
+        el.questionState.classList.remove('active');
+        el.summaryState.classList.add('active');
+        
+        // Fetch final summary from server to be sure
+        fetch("<?= esc($summaryUrl) ?>", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sessionId: el.sessionCodeInp.value.trim() || 'SESI-<?= esc($authUser['id_user'] ?? uniqid()) ?>'
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.ok && data.summary) {
+                const s = data.summary;
+                document.getElementById('summaryTotal').textContent = s.totalQuestions;
+                document.getElementById('summaryAnswered').textContent = s.totalAnswered;
+                document.getElementById('summaryDuration').textContent = s.durationText;
+                document.getElementById('summaryViolations').textContent = s.violations;
+            }
+        });
+    } else if (interviewState.isStarted && !interviewState.isLocked) {
+        startTimer();
+        el.introState.classList.remove('active');
+        el.questionState.classList.add('active');
+        switchSession(interviewState.currentSession);
     }
 </script>
 <?= $this->endSection() ?>

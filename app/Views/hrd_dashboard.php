@@ -144,6 +144,95 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
     .img-question { max-width: 100%; border-radius: 12px; margin-bottom: 15px; border: 1px solid var(--line); }
     
     .scrollable-modal-body { max-height: 70vh; overflow-y: auto; }
+
+    /* Custom Alert Overlay */
+    .custom-alert-overlay {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(4px);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .custom-alert-overlay.active {
+        display: flex;
+        opacity: 1;
+    }
+
+    .custom-alert-box {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 28px 24px;
+        width: 100%;
+        max-width: 340px;
+        text-align: center;
+        box-shadow: 0 15px 50px rgba(0,0,0,0.15);
+        transform: scale(0.9);
+        transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .custom-alert-overlay.active .custom-alert-box {
+        transform: scale(1);
+    }
+
+    .custom-alert-icon {
+        font-size: 54px;
+        line-height: 1;
+        margin-bottom: 16px;
+        color: #f5a623;
+    }
+
+    .custom-alert-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #262626;
+        margin: 0 0 10px;
+    }
+
+    .custom-alert-message {
+        font-size: 14px;
+        color: #737373;
+        margin: 0 0 24px;
+        line-height: 1.4;
+    }
+
+    .custom-alert-footer {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .custom-alert-btn {
+        width: 100%;
+        padding: 12px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 14px;
+        transition: all 0.2s ease;
+    }
+
+    .btn-alert-primary {
+        background: var(--green-1);
+        color: #fff;
+    }
+
+    .btn-alert-secondary {
+        background: #efefef;
+        color: #262626;
+    }
+
+    .btn-alert-primary:hover { opacity: 0.9; }
+    .btn-alert-secondary:hover { background: #e5e5e5; }
+
+    .table-danger-light {
+        background-color: #fff5f5 !important;
+    }
 </style>
 <?= $this->endSection() ?>
 
@@ -181,10 +270,11 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
         </div>
         <div class="table-responsive">
             <table class="table">
-                <thead><tr><th>Peserta</th><th>Status</th><th>Pelanggaran</th><th>Terakhir Update</th><th>Aksi</th></tr></thead>
+                <thead><tr><th>Peserta</th><th>Status</th><th>Pelanggaran</th><th>Waktu Sisa</th><th>Terakhir Update</th><th>Aksi</th></tr></thead>
                 <tbody id="sessionsTableBody"></tbody>
             </table>
         </div>
+        <div id="sessionsPagination" class="d-flex justify-content-center mt-3 gap-2"></div>
     </section>
     
     <aside class="card">
@@ -192,6 +282,7 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
             <i class="bi bi-bell"></i> Log Pelanggaran
         </div>
         <div id="recentViolationsList"></div>
+        <div id="violationsPagination" class="d-flex justify-content-center mt-3 gap-1"></div>
     </aside>
 </div>
 
@@ -306,6 +397,21 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
         </div>
     </div>
 </div>
+
+<!-- Custom Alert Modal (Instagram Style) -->
+<div id="customAlertOverlay" class="custom-alert-overlay">
+    <div class="custom-alert-box">
+        <div id="customAlertIcon" class="custom-alert-icon">
+            <i class="bi bi-exclamation-circle-fill"></i>
+        </div>
+        <h4 id="customAlertTitle" class="custom-alert-title">Judul Alert</h4>
+        <p id="customAlertMessage" class="custom-alert-message">Pesan alert di sini...</p>
+        <div class="custom-alert-footer" id="customAlertFooter">
+            <button id="customAlertBtnPrimary" class="custom-alert-btn btn-alert-primary">Mengerti</button>
+            <button id="customAlertBtnSecondary" class="custom-alert-btn btn-alert-secondary" style="display:none;">Batal</button>
+        </div>
+    </div>
+</div>
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
@@ -318,6 +424,11 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
         answersReport: <?= json_encode($answersReport ?? []) ?>,
     };
 
+    const state = {
+        sessionsPage: 1,
+        violationsPage: 1
+    };
+
     const unblockUrl = "<?= site_url('dashboard-hrd/unblock') ?>";
 
     const el = {
@@ -327,68 +438,217 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
         totalViolationsMetric: document.getElementById('totalViolationsMetric'),
         sessionsTableBody: document.getElementById('sessionsTableBody'),
         recentViolationsList: document.getElementById('recentViolationsList'),
+        sessionsPagination: document.getElementById('sessionsPagination'),
+        violationsPagination: document.getElementById('violationsPagination'),
     };
 
     function escapeHtml(v) { return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
     function formatDate(v) { return v ? new Date(v).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'}) : '-'; }
     function initials(n) { return (n || 'U').split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase(); }
 
+    function showCustomAlert(msg, title = 'Info', options = {}) {
+        const overlay = document.getElementById('customAlertOverlay');
+        const titleEl = document.getElementById('customAlertTitle');
+        const msgEl = document.getElementById('customAlertMessage');
+        const iconEl = document.getElementById('customAlertIcon');
+        const btnPrimary = document.getElementById('customAlertBtnPrimary');
+        const btnSecondary = document.getElementById('customAlertBtnSecondary');
+
+        titleEl.textContent = title;
+        msgEl.textContent = msg;
+        btnPrimary.textContent = options.primaryText || 'Mengerti';
+        
+        if (options.icon) iconEl.innerHTML = `<i class="bi ${options.icon}"></i>`;
+        if (options.iconColor) iconEl.style.color = options.iconColor;
+        else iconEl.style.color = '#f5a623';
+
+        if (options.showSecondary) {
+            btnSecondary.style.display = 'block';
+            btnSecondary.textContent = options.secondaryText || 'Batal';
+        } else {
+            btnSecondary.style.display = 'none';
+        }
+
+        overlay.style.display = 'flex';
+        setTimeout(() => overlay.classList.add('active'), 10);
+
+        btnPrimary.onclick = () => {
+            overlay.classList.remove('active');
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                if (options.onPrimary) options.onPrimary();
+            }, 300);
+        };
+
+        btnSecondary.onclick = () => {
+            overlay.classList.remove('active');
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                if (options.onSecondary) options.onSecondary();
+            }, 300);
+        };
+    }
+
+    function calculateTimeLeft(startedAt, durationMinutes) {
+        if (!startedAt) return '--:--';
+        const start = new Date(startedAt.replace(' ', 'T')).getTime();
+        if (isNaN(start)) return '--:--';
+        const now = Date.now();
+        const elapsed = Math.floor((now - start) / 1000);
+        const total = durationMinutes * 60;
+        const left = total - elapsed;
+        
+        if (left <= 0) return '<span class="text-danger fw-bold">00:00</span>';
+        const m = Math.floor(left / 60);
+        const s = left % 60;
+        return `<span class="fw-bold">${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}</span>`;
+    }
+
     function renderSessions(sessions) {
+        const pageSize = 5;
+        const totalPages = Math.ceil(sessions.length / pageSize) || 1;
+        if (state.sessionsPage > totalPages) state.sessionsPage = totalPages;
+        
+        const start = (state.sessionsPage - 1) * pageSize;
+        const paged = sessions.slice(start, start + pageSize);
+
         if (!sessions.length) {
-            el.sessionsTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted">Belum ada sesi interview hari ini.</td></tr>';
+            el.sessionsTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">Belum ada sesi interview hari ini.</td></tr>';
+            el.sessionsPagination.innerHTML = '';
             return;
         }
-        el.sessionsTableBody.innerHTML = sessions.map(s => `
-            <tr>
-                <td>
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="avatar-sm">${escapeHtml(initials(s.candidateName))}</div>
-                        <div>
-                            <div class="fw-bold text-dark">${escapeHtml(s.candidateName)}</div>
-                            <div class="small text-muted">${escapeHtml(s.idUser)}</div>
+
+        el.sessionsTableBody.innerHTML = paged.map(s => {
+            const isBlocked = s.blockedCandidate || s.status === 'locked';
+            const rowClass = isBlocked ? 'table-danger-light' : '';
+            
+            return `
+                <tr class="${rowClass}">
+                    <td>
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="avatar-sm">${escapeHtml(initials(s.candidateName))}</div>
+                            <div>
+                                <div class="fw-bold text-dark">${escapeHtml(s.candidateName)}</div>
+                                <div class="small text-muted">${escapeHtml(s.idUser)}</div>
+                            </div>
                         </div>
-                    </div>
-                </td>
-                <td><span class="status-pill status-${s.status}">${s.status}</span></td>
-                <td><span class="fw-bold ${s.violations > 0 ? 'text-danger' : 'text-success'}">${s.violations} Event</span></td>
-                <td class="text-muted fw-semibold">${formatDate(s.updatedAt)}</td>
-                <td>
-                    ${s.blockedCandidate 
-                        ? `<button class="btn btn-sm btn-primary py-1 px-2" style="font-size:12px; min-height:0" onclick="unblockSession('${s.sessionId}')">Buka Blokir</button>`
-                        : `<span class="text-muted">-</span>`
-                    }
-                </td>
-            </tr>
-        `).join('');
+                    </td>
+                    <td><span class="status-pill status-${s.status}">${s.status}</span></td>
+                    <td>
+                        <span class="fw-bold ${s.violations > 0 ? 'text-danger' : 'text-success'}">
+                            <i class="bi ${s.violations > 0 ? 'bi-exclamation-triangle-fill' : 'bi-check-circle-fill'}"></i>
+                            ${s.violations} Event
+                        </span>
+                    </td>
+                    <td>${s.status === 'completed' || s.status === 'time_up' ? '<span class="text-muted">Selesai</span>' : calculateTimeLeft(s.startedAt, s.testDuration)}</td>
+                    <td class="text-muted fw-semibold">${formatDate(s.updatedAt)}</td>
+                    <td>
+                        ${isBlocked 
+                            ? `<button class="btn btn-sm btn-danger py-1 px-2" style="font-size:12px; min-height:0; background-color: var(--danger) !important; color: white !important;" onclick="unblockSession('${s.sessionId}')"><i class="bi bi-unlock-fill"></i> Buka Blokir</button>`
+                            : `<span class="text-muted">-</span>`
+                        }
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        renderPagination(el.sessionsPagination, state.sessionsPage, totalPages, (p) => {
+            state.sessionsPage = p;
+            renderSessions(sessions);
+        });
+    }
+
+    function renderPagination(container, current, total, onPage) {
+        if (total <= 1) {
+            container.innerHTML = '';
+            return;
+        }
+        let html = `
+            <button class="btn btn-sm btn-secondary p-1" ${current === 1 ? 'disabled' : ''} onclick="window.pageCallback(${current - 1})"><i class="bi bi-chevron-left"></i></button>
+        `;
+        for (let i = 1; i <= total; i++) {
+            html += `<button class="btn btn-sm ${i === current ? 'btn-primary' : 'btn-secondary'} py-1 px-2" onclick="window.pageCallback(${i})">${i}</button>`;
+        }
+        html += `
+            <button class="btn btn-sm btn-secondary p-1" ${current === total ? 'disabled' : ''} onclick="window.pageCallback(${current + 1})"><i class="bi bi-chevron-right"></i></button>
+        `;
+        container.innerHTML = html;
+        window.pageCallback = onPage;
     }
 
     async function unblockSession(sessionId) {
-        if (!confirm('Apakah Anda yakin ingin membuka blokir sesi ini?')) return;
-        try {
-            const formData = new FormData();
-            formData.append('sessionId', sessionId);
-            const res = await fetch(unblockUrl, {
-                method: 'POST',
-                body: formData
-            });
-            if (res.ok) refresh();
-        } catch(e) {}
+        showCustomAlert(
+            'Apakah Anda yakin ingin membuka blokir pegawai ini? Pegawai dapat melanjutkan tes kembali setelah blokir dibuka.',
+            'Buka Blokir Pegawai',
+            {
+                showSecondary: true,
+                primaryText: 'Buka Blokir',
+                secondaryText: 'Batal',
+                icon: 'bi-unlock-fill',
+                onPrimary: async () => {
+                    try {
+                        const formData = new FormData();
+                        formData.append('sessionId', sessionId);
+                        const res = await fetch(unblockUrl, {
+                            method: 'POST',
+                            body: formData
+                        });
+                        if (res.ok) {
+                            refresh();
+                            setTimeout(() => {
+                                showCustomAlert('Blokir pegawai berhasil dibuka.', 'Sukses', {
+                                    icon: 'bi-check-circle-fill',
+                                    iconColor: 'var(--green-1)'
+                                });
+                            }, 400);
+                        }
+                    } catch(e) {}
+                }
+            }
+        );
     }
 
     function renderViolations(violations) {
+        const pageSize = 5;
+        const totalPages = Math.ceil(violations.length / pageSize) || 1;
+        if (state.violationsPage > totalPages) state.violationsPage = totalPages;
+        
+        const start = (state.violationsPage - 1) * pageSize;
+        const paged = violations.slice(start, start + pageSize);
+
         if (!violations.length) {
             el.recentViolationsList.innerHTML = '<div class="text-center py-4 text-muted small">Tidak ada pelanggaran terdeteksi.</div>';
+            el.violationsPagination.innerHTML = '';
             return;
         }
-        el.recentViolationsList.innerHTML = violations.map(v => `
-            <div class="violation-item">
-                <div class="d-flex justify-content-between align-items-start">
-                    <strong>${escapeHtml(v.candidateName)}</strong>
-                    <span class="violation-time">${formatDate(v.at)}</span>
+
+        el.recentViolationsList.innerHTML = paged.map(v => {
+            const isBlocked = v.status === 'locked' || v.status === 'blocked';
+            const statusBadge = isBlocked ? '<span class="badge bg-danger ms-1" style="font-size:9px">BLOCKED</span>' : '';
+            const typeBadge = `<span class="badge ${v.count > 1 ? 'bg-danger' : 'bg-warning'} text-dark ms-1" style="font-size:9px">${v.type.toUpperCase()}</span>`;
+
+            return `
+                <div class="violation-item" style="padding: 12px;">
+                    <div class="d-flex justify-content-between align-items-start mb-1">
+                        <div style="min-width:0">
+                            <strong style="font-size:13px; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(v.candidateName)}</strong>
+                            <div class="small text-muted" style="font-size:10px">${escapeHtml(v.idUser)}</div>
+                        </div>
+                        <span class="violation-time">${formatDate(v.at)}</span>
+                    </div>
+                    <div class="d-flex align-items-center mt-2 flex-wrap gap-1">
+                        <span class="badge bg-light text-dark border" style="font-size:9px">${v.count}x</span>
+                        ${typeBadge}
+                        ${statusBadge}
+                    </div>
                 </div>
-                <p>${escapeHtml(v.message)}</p>
-            </div>
-        `).join('');
+            `;
+        }).join('');
+
+        renderPagination(el.violationsPagination, state.violationsPage, totalPages, (p) => {
+            state.violationsPage = p;
+            renderViolations(violations);
+        });
     }
 
     function renderAnswers(summaries) {
