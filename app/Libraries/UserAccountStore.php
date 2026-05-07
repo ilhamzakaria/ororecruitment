@@ -2,11 +2,27 @@
 
 namespace App\Libraries;
 
-use CodeIgniter\Database\BaseConnection;
+use App\Models\UserModel;
+use App\Models\PegawaiModel;
+use App\Models\HrdModel;
+use App\Models\ManagerModel;
 use Throwable;
 
 class UserAccountStore
 {
+    protected UserModel $userModel;
+    protected PegawaiModel $pegawaiModel;
+    protected HrdModel $hrdModel;
+    protected ManagerModel $managerModel;
+
+    public function __construct()
+    {
+        $this->userModel = new UserModel();
+        $this->pegawaiModel = new PegawaiModel();
+        $this->hrdModel = new HrdModel();
+        $this->managerModel = new ManagerModel();
+    }
+
     /**
      * @return array<string, mixed>|null
      */
@@ -17,31 +33,21 @@ class UserAccountStore
             return null;
         }
 
-        $db = $this->db();
-        if ($db === null) {
-            return null;
-        }
-
         try {
-            // 1. Check in users table
-            $userAuth = $db->table('users')
-                ->groupStart()
+            $userAuth = $this->userModel->groupStart()
                     ->where('id', $idUser)
                     ->orWhere('username', $idUser)
                 ->groupEnd()
-                ->get()
-                ->getRowArray();
+                ->first();
 
             if (!$userAuth) {
                 return null;
             }
 
-            // 2. Check password
             if (!$this->passwordMatches($password, (string) ($userAuth['password'] ?? ''))) {
                 return null;
             }
 
-            // 3. Check status
             if (($userAuth['status'] ?? 'nonaktif') !== 'aktif') {
                 throw new \Exception('Akun Anda belum aktif atau dinonaktifkan oleh HRD.');
             }
@@ -50,14 +56,13 @@ class UserAccountStore
                 throw new \Exception('Akun Anda telah dieliminasi dari sistem.');
             }
 
-            // 4. Fetch profile data based on role
             $profile = null;
             if ($userAuth['role'] === 'pegawai') {
-                $profile = $db->table('pegawai')->where('id_user', $userAuth['id'])->get()->getRowArray();
+                $profile = $this->pegawaiModel->find($userAuth['id']);
             } elseif ($userAuth['role'] === 'hrd') {
-                $profile = $db->table('hrd')->where('id_hrd', $userAuth['id'])->get()->getRowArray();
+                $profile = $this->hrdModel->find($userAuth['id']);
             } else {
-                $profile = $db->table('manager')->where('id_manager', $userAuth['id'])->get()->getRowArray();
+                $profile = $this->managerModel->find($userAuth['id']);
             }
 
             if (!$profile) {
@@ -66,9 +71,8 @@ class UserAccountStore
 
             $publicUser = $this->publicUser(array_merge($userAuth, $profile), $userAuth['role']);
             
-            // 5. Update session_id if provided
             if ($sessionId) {
-                $db->table('users')->where('id', $userAuth['id'])->update(['session_id' => $sessionId]);
+                $this->userModel->update($userAuth['id'], ['session_id' => $sessionId]);
             }
             
             return $publicUser;
@@ -82,10 +86,7 @@ class UserAccountStore
 
     public function logout(string $idUser, string $role): void
     {
-        $db = $this->db();
-        if (!$db) return;
-
-        $db->table('users')->where('id', $idUser)->update(['session_id' => null]);
+        $this->userModel->update($idUser, ['session_id' => null]);
     }
 
     /**
@@ -94,21 +95,16 @@ class UserAccountStore
     public function findById(string $idUser): ?array
     {
         $idUser = $this->normalizeIdUser($idUser);
-        $db = $this->db();
-        if ($db === null) {
-            return null;
-        }
-
         try {
-            $userAuth = $db->table('users')->where('id', $idUser)->get()->getRowArray();
+            $userAuth = $this->userModel->find($idUser);
             if (!$userAuth) return null;
 
             if ($userAuth['role'] === 'pegawai') {
-                $profile = $db->table('pegawai')->where('id_user', $userAuth['id'])->get()->getRowArray();
+                $profile = $this->pegawaiModel->find($userAuth['id']);
             } elseif ($userAuth['role'] === 'hrd') {
-                $profile = $db->table('hrd')->where('id_hrd', $userAuth['id'])->get()->getRowArray();
+                $profile = $this->hrdModel->find($userAuth['id']);
             } else {
-                $profile = $db->table('manager')->where('id_manager', $userAuth['id'])->get()->getRowArray();
+                $profile = $this->managerModel->find($userAuth['id']);
             }
 
             if (!$profile) return null;
@@ -125,17 +121,13 @@ class UserAccountStore
      */
     public function listHrd(): array
     {
-        $db = $this->db();
-        if ($db === null) return [];
-
         try {
-            return $db->table('hrd')
+            return $this->hrdModel
                 ->select('hrd.*, users.username, users.status, users.session_id')
                 ->join('users', 'users.id = hrd.id_hrd')
                 ->where('users.role', 'hrd')
                 ->orderBy('hrd.nama', 'ASC')
-                ->get()
-                ->getResultArray();
+                ->findAll();
         } catch (Throwable) {
             return [];
         }
@@ -143,18 +135,14 @@ class UserAccountStore
 
     public function listPegawai(): array
     {
-        $db = $this->db();
-        if ($db === null) return [];
-
         try {
-            return $db->table('pegawai')
+            return $this->pegawaiModel
                 ->select('pegawai.*, users.username, users.status, users.status_pengguna, users.session_id')
                 ->join('users', 'users.id = pegawai.id_user')
                 ->where('users.role', 'pegawai')
                 ->where('users.status_pengguna', 'aktif')
                 ->orderBy('pegawai.nama', 'ASC')
-                ->get()
-                ->getResultArray();
+                ->findAll();
         } catch (Throwable) {
             return [];
         }
@@ -162,30 +150,24 @@ class UserAccountStore
 
     public function listEliminasi(): array
     {
-        $db = $this->db();
-        if ($db === null) return [];
-
         try {
-            $pegawai = $db->table('pegawai')
+            $pegawai = $this->pegawaiModel
                 ->select('pegawai.*, users.username, users.status, users.status_pengguna, users.role, users.tanggal_eliminasi, users.dieliminasi_oleh')
                 ->join('users', 'users.id = pegawai.id_user')
                 ->where('users.status_pengguna', 'eliminasi')
-                ->get()
-                ->getResultArray();
+                ->findAll();
 
-            $hrd = $db->table('hrd')
+            $hrd = $this->hrdModel
                 ->select('hrd.*, users.username, users.status, users.status_pengguna, users.role, users.tanggal_eliminasi, users.dieliminasi_oleh')
                 ->join('users', 'users.id = hrd.id_hrd')
                 ->where('users.status_pengguna', 'eliminasi')
-                ->get()
-                ->getResultArray();
+                ->findAll();
 
-            $manager = $db->table('manager')
+            $manager = $this->managerModel
                 ->select('manager.*, users.username, users.status, users.status_pengguna, users.role, users.tanggal_eliminasi, users.dieliminasi_oleh')
                 ->join('users', 'users.id = manager.id_manager')
                 ->where('users.status_pengguna', 'eliminasi')
-                ->get()
-                ->getResultArray();
+                ->findAll();
 
             return array_merge($pegawai, $hrd, $manager);
         } catch (Throwable) {
@@ -195,17 +177,13 @@ class UserAccountStore
 
     public function listManager(): array
     {
-        $db = $this->db();
-        if ($db === null) return [];
-
         try {
-            return $db->table('manager')
+            return $this->managerModel
                 ->select('manager.*, users.username, users.status, users.session_id')
                 ->join('users', 'users.id = manager.id_manager')
                 ->where('users.role', 'manager')
                 ->orderBy('manager.nama', 'ASC')
-                ->get()
-                ->getResultArray();
+                ->findAll();
         } catch (Throwable) {
             return [];
         }
@@ -217,16 +195,12 @@ class UserAccountStore
     public function findPegawaiProfileByIdUser(string $idUser): ?array
     {
         $idUser = $this->normalizeIdUser($idUser);
-        $db = $this->db();
-        if ($db === null) return null;
-
         try {
-            $row = $db->table('pegawai')
+            $row = $this->pegawaiModel
                 ->select('pegawai.*, users.username, users.status')
                 ->join('users', 'users.id = pegawai.id_user')
                 ->where('pegawai.id_user', $idUser)
-                ->get()
-                ->getRowArray();
+                ->first();
 
             if (!$row) return null;
 
@@ -245,63 +219,61 @@ class UserAccountStore
 
     public function register(array $data, string $role): bool
     {
-        $db = $this->db();
-        if (!$db) return false;
-
+        $db = \Config\Database::connect();
         $db->transBegin();
 
         try {
             if ($role === 'hrd') {
-                $count = $db->table('hrd')->countAllResults();
+                $count = $this->hrdModel->countAllResults();
                 $id = 'HRD' . str_pad($count + 1, 3, '0', STR_PAD_LEFT);
                 
-                $db->table('users')->insert([
+                $this->userModel->insert([
                     'id'         => $id,
                     'username'   => $data['username'],
-                    'password'   => $data['password'],
+                    'password'   => password_hash($data['password'], PASSWORD_DEFAULT),
                     'role'       => 'hrd',
                     'status'     => 'aktif',
                     'created_at' => date('Y-m-d H:i:s'),
                     'updated_at' => date('Y-m-d H:i:s'),
                 ]);
 
-                $db->table('hrd')->insert([
+                $this->hrdModel->insert([
                     'id_hrd' => $id,
                     'nama'   => $data['nama'],
                 ]);
             } elseif ($role === 'manager') {
-                $count = $db->table('manager')->countAllResults();
+                $count = $this->managerModel->countAllResults();
                 $id = 'MGR' . str_pad($count + 1, 3, '0', STR_PAD_LEFT);
                 
-                $db->table('users')->insert([
+                $this->userModel->insert([
                     'id'         => $id,
                     'username'   => $data['username'],
-                    'password'   => $data['password'],
+                    'password'   => password_hash($data['password'], PASSWORD_DEFAULT),
                     'role'       => 'manager',
                     'status'     => 'aktif',
                     'created_at' => date('Y-m-d H:i:s'),
                     'updated_at' => date('Y-m-d H:i:s'),
                 ]);
 
-                $db->table('manager')->insert([
+                $this->managerModel->insert([
                     'id_manager' => $id,
                     'nama'       => $data['nama'],
                 ]);
             } else {
-                $count = $db->table('pegawai')->countAllResults();
+                $count = $this->pegawaiModel->countAllResults();
                 $id = 'PGW' . str_pad($count + 1, 3, '0', STR_PAD_LEFT);
 
-                $db->table('users')->insert([
+                $this->userModel->insert([
                     'id'         => $id,
                     'username'   => $data['username'],
-                    'password'   => $data['password'],
+                    'password'   => password_hash($data['password'], PASSWORD_DEFAULT),
                     'role'       => 'pegawai',
                     'status'     => 'nonaktif',
                     'created_at' => date('Y-m-d H:i:s'),
                     'updated_at' => date('Y-m-d H:i:s'),
                 ]);
 
-                $db->table('pegawai')->insert([
+                $this->pegawaiModel->insert([
                     'id_user' => $id,
                     'nama'    => $data['nama'],
                     'posisi'  => $data['posisi'] ?? '',
@@ -323,21 +295,10 @@ class UserAccountStore
         }
     }
 
-    private function db(): ?BaseConnection
-    {
-        try {
-            $db = db_connect();
-            $db->initialize();
-            return $db;
-        } catch (Throwable) {
-            return null;
-        }
-    }
-
     private function publicUser(array $user, string $role): array
     {
         return [
-            'id_user'      => trim((string) ($user['id_user'] ?? $user['id_hrd'] ?? '')),
+            'id_user'      => trim((string) ($user['id_user'] ?? $user['id_hrd'] ?? $user['id_manager'] ?? '')),
             'name'         => trim((string) ($user['nama'] ?? '')),
             'role'         => $role,
             'positionName' => trim((string) ($user['posisi'] ?? '')),

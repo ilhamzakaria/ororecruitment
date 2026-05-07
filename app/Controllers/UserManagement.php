@@ -3,15 +3,27 @@
 namespace App\Controllers;
 
 use App\Libraries\UserAccountStore;
+use App\Models\UserModel;
+use App\Models\PegawaiModel;
+use App\Models\HrdModel;
+use App\Models\ManagerModel;
 use Throwable;
 
 class UserManagement extends BaseController
 {
     private UserAccountStore $accounts;
+    protected UserModel $userModel;
+    protected PegawaiModel $pegawaiModel;
+    protected HrdModel $hrdModel;
+    protected ManagerModel $managerModel;
 
     public function __construct()
     {
         $this->accounts = new UserAccountStore();
+        $this->userModel = new UserModel();
+        $this->pegawaiModel = new PegawaiModel();
+        $this->hrdModel = new HrdModel();
+        $this->managerModel = new ManagerModel();
     }
 
     public function index()
@@ -39,18 +51,16 @@ class UserManagement extends BaseController
         }
 
         $id = $this->request->getPost('id');
-        $role = $this->request->getPost('role'); // We need role to check permission
+        $role = $this->request->getPost('role');
         $status = $this->request->getPost('status');
         $authUser = $this->authUser();
 
-        // HRD cannot toggle status of other HRD or Manager
         if ($authUser['role'] === 'hrd' && ($role === 'hrd' || $role === 'manager')) {
             return $this->response->setStatusCode(403)->setJSON(['ok' => false, 'message' => 'HRD tidak boleh mengubah status HRD lain atau Manager.']);
         }
 
-        $db = db_connect();
         try {
-            $db->table('users')->where('id', $id)->update(['status' => $status]);
+            $this->userModel->setStatus($id, $status);
             return $this->response->setJSON(['ok' => true]);
         } catch (Throwable $e) {
             return $this->response->setStatusCode(500)->setJSON(['ok' => false, 'message' => $e->getMessage()]);
@@ -67,19 +77,12 @@ class UserManagement extends BaseController
         $role = $this->request->getPost('role');
         $authUser = $this->authUser();
 
-        // HRD cannot delete other HRD or Manager
         if ($authUser['role'] === 'hrd' && ($role === 'hrd' || $role === 'manager')) {
             return $this->response->setStatusCode(403)->setJSON(['ok' => false, 'message' => 'HRD tidak boleh menghapus HRD lain atau Manager.']);
         }
 
-        $db = db_connect();
         try {
-            $db->table('users')->where('id', $id)->update([
-                'status_pengguna' => 'eliminasi',
-                'tanggal_eliminasi' => date('Y-m-d H:i:s'),
-                'dieliminasi_oleh' => $authUser['username']
-            ]);
-
+            $this->userModel->eliminate($id, $authUser['username']);
             return $this->response->setJSON(['ok' => true]);
         } catch (Throwable $e) {
             return $this->response->setStatusCode(500)->setJSON(['ok' => false, 'message' => $e->getMessage()]);
@@ -94,14 +97,8 @@ class UserManagement extends BaseController
 
         $id = $this->request->getPost('id');
         
-        $db = db_connect();
         try {
-            $db->table('users')->where('id', $id)->update([
-                'status_pengguna' => 'aktif',
-                'tanggal_eliminasi' => null,
-                'dieliminasi_oleh' => null
-            ]);
-
+            $this->userModel->restore($id);
             return $this->response->setJSON(['ok' => true]);
         } catch (Throwable $e) {
             return $this->response->setStatusCode(500)->setJSON(['ok' => false, 'message' => $e->getMessage()]);
@@ -118,7 +115,6 @@ class UserManagement extends BaseController
         $role = $this->request->getPost('role');
         $authUser = $this->authUser();
 
-        // HRD cannot update other HRD or Manager
         if ($authUser['role'] === 'hrd' && ($role === 'hrd' || $role === 'manager')) {
             return redirect()->back()->with('error', 'HRD tidak boleh mengedit HRD lain atau Manager.');
         }
@@ -142,16 +138,16 @@ class UserManagement extends BaseController
             $profileData['alamat'] = $this->request->getPost('alamat');
         }
 
-        $db = db_connect();
+        $db = \Config\Database::connect();
         $db->transBegin();
         try {
-            $db->table('users')->where('id', $id)->update($authData);
+            $this->userModel->update($id, $authData);
             if ($role === 'hrd') {
-                $db->table('hrd')->where('id_hrd', $id)->update($profileData);
+                $this->hrdModel->update($id, $profileData);
             } elseif ($role === 'manager') {
-                $db->table('manager')->where('id_manager', $id)->update($profileData);
+                $this->managerModel->update($id, $profileData);
             } else {
-                $db->table('pegawai')->where('id_user', $id)->update($profileData);
+                $this->pegawaiModel->update($id, $profileData);
             }
 
             if ($db->transStatus() === false) {
@@ -175,7 +171,6 @@ class UserManagement extends BaseController
         $role = $this->request->getPost('role');
         $authUser = $this->authUser();
 
-        // HRD cannot add HRD or Manager
         if ($authUser['role'] === 'hrd' && ($role === 'hrd' || $role === 'manager')) {
             return redirect()->back()->with('error', 'HRD hanya boleh menambahkan Pegawai.');
         }
@@ -183,7 +178,7 @@ class UserManagement extends BaseController
         $data = [
             'nama' => $this->request->getPost('nama'),
             'username' => $this->request->getPost('username'),
-            'password' => password_hash((string)$this->request->getPost('password'), PASSWORD_DEFAULT),
+            'password' => (string)$this->request->getPost('password'),
         ];
 
         if ($role === 'pegawai') {
@@ -193,8 +188,7 @@ class UserManagement extends BaseController
 
         if ($this->accounts->register($data, $role)) {
             // Force active if added by HRD/Manager
-            $db = db_connect();
-            $db->table('users')->where('username', $data['username'])->update(['status' => 'aktif']);
+            $this->userModel->where('username', $data['username'])->set(['status' => 'aktif'])->update();
 
             return redirect()->back()->with('success', 'User berhasil ditambahkan.');
         }

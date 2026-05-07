@@ -8,8 +8,8 @@ use Throwable;
 
 class QuestionManagement extends BaseController
 {
-    protected $questionModel;
-    protected $answerModel;
+    protected SessionQuestionModel $questionModel;
+    protected SessionAnswerModel $answerModel;
 
     public function __construct()
     {
@@ -24,16 +24,7 @@ class QuestionManagement extends BaseController
         }
 
         $this->questionModel->setSession($session);
-
-        // Auto-initialize null urutan_pertanyaan
-        $nullQuestions = $this->questionModel->where('urutan_pertanyaan', null)->orWhere('urutan_pertanyaan', 0)->orderBy('id_pertanyaan', 'ASC')->findAll();
-        if (!empty($nullQuestions)) {
-            $maxOrder = $this->questionModel->selectMax('urutan_pertanyaan')->first();
-            $nextOrder = ($maxOrder['urutan_pertanyaan'] ?? 0) + 1;
-            foreach ($nullQuestions as $nq) {
-                $this->questionModel->update($nq['id_pertanyaan'], ['urutan_pertanyaan' => $nextOrder++]);
-            }
-        }
+        $this->questionModel->autoInitializeOrder();
 
         return view('hrd_manage_questions', [
             'questions' => $this->questionModel->orderBy('urutan_pertanyaan', 'ASC')->findAll(),
@@ -50,14 +41,9 @@ class QuestionManagement extends BaseController
         }
 
         $this->questionModel->setSession($session);
-        $authUser = $this->authUser();
         
-        // Get max order
-        $maxOrder = $this->questionModel->selectMax('urutan_pertanyaan')->first();
-        $nextOrder = ($maxOrder['urutan_pertanyaan'] ?? 0) + 1;
-
         $data = [
-            'urutan_pertanyaan' => $nextOrder,
+            'urutan_pertanyaan' => $this->questionModel->getNextOrder(),
             'isi_pertanyaan'   => $this->request->getPost('isi_pertanyaan'),
             'tipe_pertanyaan'  => $this->request->getPost('tipe_pertanyaan'),
             'pilihan_a'        => $this->request->getPost('pilihan_a'),
@@ -78,7 +64,7 @@ class QuestionManagement extends BaseController
         // Handle main question image
         $data['gambar_pertanyaan'] = $this->handleUpload('gambar_pertanyaan');
 
-        // Handle option images and text cleanup
+        // Handle option images
         foreach (['a', 'b', 'c', 'd', 'e'] as $o) {
             $type = $data["tipe_pilihan_$o"];
             $imgField = "gambar_pilihan_$o";
@@ -125,7 +111,7 @@ class QuestionManagement extends BaseController
             'tanggal_diubah'   => date('Y-m-d H:i:s'),
         ];
 
-        // Handle uploads and type-based cleanup
+        // Handle uploads
         if ($img = $this->handleUpload('gambar_pertanyaan')) {
             $data['gambar_pertanyaan'] = $img;
         }
@@ -160,16 +146,7 @@ class QuestionManagement extends BaseController
         $this->questionModel->setSession($session);
         $id = $this->request->getPost('id');
         try {
-            $question = $this->questionModel->find($id);
-            if ($question) {
-                $order = $question['urutan_pertanyaan'];
-                $this->questionModel->delete($id);
-                
-                // Shift subsequent questions down to fill the gap
-                $this->questionModel->where('urutan_pertanyaan >', $order)
-                                    ->set('urutan_pertanyaan', 'urutan_pertanyaan - 1', false)
-                                    ->update();
-            }
+            $this->questionModel->deleteAndShift($id);
             return $this->response->setJSON(['ok' => true]);
         } catch (Throwable $e) {
             return $this->response->setStatusCode(500)->setJSON(['ok' => false, 'message' => $e->getMessage()]);
@@ -184,51 +161,13 @@ class QuestionManagement extends BaseController
 
         $this->questionModel->setSession($session);
         $id = $this->request->getPost('id');
-        $direction = $this->request->getPost('direction'); // 'up', 'down', or numeric target
+        $direction = $this->request->getPost('direction');
         
-        $currentQuestion = $this->questionModel->find($id);
-        if (!$currentQuestion) {
-            return $this->response->setStatusCode(404)->setJSON(['ok' => false, 'message' => 'Question not found']);
-        }
-
-        $currentOrder = (int)$currentQuestion['urutan_pertanyaan'];
-        $allQuestions = $this->questionModel->orderBy('urutan_pertanyaan', 'ASC')->findAll();
-        $total = count($allQuestions);
-
-        if ($direction === 'up' && $currentOrder > 1) {
-            $targetOrder = $currentOrder - 1;
-        } elseif ($direction === 'down' && $currentOrder < $total) {
-            $targetOrder = $currentOrder + 1;
-        } elseif (is_numeric($direction)) {
-            $targetOrder = (int)$direction;
-        } else {
-            return $this->response->setJSON(['ok' => false, 'message' => 'Invalid direction or boundary reached']);
-        }
-
-        if ($targetOrder < 1) $targetOrder = 1;
-        if ($targetOrder > $total) $targetOrder = $total;
-
-        if ($targetOrder === $currentOrder) {
-            return $this->response->setJSON(['ok' => true]);
-        }
-
         try {
-            if ($targetOrder < $currentOrder) {
-                // Moving up: shift others down
-                $this->questionModel->where('urutan_pertanyaan >=', $targetOrder)
-                                    ->where('urutan_pertanyaan <', $currentOrder)
-                                    ->set('urutan_pertanyaan', 'urutan_pertanyaan + 1', false)
-                                    ->update();
-            } else {
-                // Moving down: shift others up
-                $this->questionModel->where('urutan_pertanyaan >', $currentOrder)
-                                    ->where('urutan_pertanyaan <=', $targetOrder)
-                                    ->set('urutan_pertanyaan', 'urutan_pertanyaan - 1', false)
-                                    ->update();
+            if ($this->questionModel->reorder($id, $direction)) {
+                return $this->response->setJSON(['ok' => true]);
             }
-
-            $this->questionModel->update($id, ['urutan_pertanyaan' => $targetOrder]);
-            return $this->response->setJSON(['ok' => true]);
+            return $this->response->setJSON(['ok' => false, 'message' => 'Gagal mengubah urutan.']);
         } catch (Throwable $e) {
             return $this->response->setStatusCode(500)->setJSON(['ok' => false, 'message' => $e->getMessage()]);
         }

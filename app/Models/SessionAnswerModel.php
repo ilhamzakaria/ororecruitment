@@ -26,4 +26,32 @@ class SessionAnswerModel extends Model
         $this->table = "jawaban_sesi_$session";
         return $this;
     }
+
+    public function getByParticipant(string $idPegawai)
+    {
+        return $this->where('id_pegawai', $idPegawai)
+                    ->orderBy('nomor_pertanyaan', 'ASC')
+                    ->findAll();
+    }
+
+    public function getScoreSummary(string $idPegawai)
+    {
+        $answers = $this->where('id_pegawai', $idPegawai)->findAll();
+        $total = count($answers);
+        $correct = 0;
+        $totalNilai = 0;
+
+        foreach ($answers as $a) {
+            if ($a['status_jawaban'] === 'Benar') {
+                $correct++;
+            }
+            $totalNilai += (int)$a['nilai'];
+        }
+
+        return [
+            'total' => $total,
+            'correct' => $correct,
+            'score' => $totalNilai,
+        ];
+    }
 }

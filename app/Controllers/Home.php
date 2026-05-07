@@ -3,14 +3,32 @@
 namespace App\Controllers;
 
 use App\Libraries\UserAccountStore;
+use App\Models\ParticipantModel;
+use App\Models\SessionStatusModel;
+use App\Models\SessionSettingModel;
+use App\Models\ViolationLogModel;
+use App\Models\SessionQuestionModel;
+use App\Models\SessionAnswerModel;
 
 class Home extends BaseController
 {
     private UserAccountStore $accounts;
+    protected ParticipantModel $participantModel;
+    protected SessionStatusModel $sessionStatusModel;
+    protected SessionSettingModel $sessionSettingModel;
+    protected ViolationLogModel $violationLogModel;
+    protected SessionQuestionModel $sessionQuestionModel;
+    protected SessionAnswerModel $sessionAnswerModel;
 
     public function __construct()
     {
         $this->accounts = new UserAccountStore();
+        $this->participantModel = new ParticipantModel();
+        $this->sessionStatusModel = new SessionStatusModel();
+        $this->sessionSettingModel = new SessionSettingModel();
+        $this->violationLogModel = new ViolationLogModel();
+        $this->sessionQuestionModel = new SessionQuestionModel();
+        $this->sessionAnswerModel = new SessionAnswerModel();
     }
 
     public function index()
@@ -25,47 +43,38 @@ class Home extends BaseController
         $defaultIdentity = $this->buildDefaultIdentity($authUser ?? []);
         $isHrd = (($authUser['role'] ?? '') === 'hrd');
 
-        $db = \Config\Database::connect();
         $sessionId = $defaultIdentity['sessionCode'] ?: 'SESI-' . uniqid();
-        $existingSession = $db->table('peserta')->where('session_id', $sessionId)->get()->getRowArray();
+        $existingSession = $this->participantModel->getBySessionId($sessionId);
         
         $currentSession = (int) ($existingSession['current_session'] ?? 1);
         
         // Get duration for current session from pengaturan_sesi
-        $sessionSetting = $db->table('pengaturan_sesi')->where('id_sesi', $currentSession)->get()->getRowArray();
+        $sessionSetting = $this->sessionSettingModel->getBySessionNumber($currentSession);
         $sessionDuration = (int) ($sessionSetting['durasi_menit'] ?? 10);
 
         // Get or initialize status_sesi_peserta
-        $sessionStatus = $db->table('status_sesi_peserta')
-            ->where('id_pegawai', $authUser['id_user'] ?? '')
-            ->where('nomor_sesi', $currentSession)
-            ->get()->getRowArray();
+        $sessionStatus = $this->sessionStatusModel->getStatus($authUser['id_user'] ?? '', $currentSession);
 
         if (!$sessionStatus && $existingSession) {
             // Initialize if not exists but main session exists
-            $db->table('status_sesi_peserta')->insert([
+            $this->sessionStatusModel->insert([
                 'id_pegawai' => $authUser['id_user'] ?? '',
                 'nomor_sesi' => $currentSession,
                 'durasi_menit' => $sessionDuration,
                 'waktu_sisa' => $sessionDuration * 60,
                 'status_sesi' => 'belum_mulai'
             ]);
-            $sessionStatus = $db->table('status_sesi_peserta')
-                ->where('id_pegawai', $authUser['id_user'] ?? '')
-                ->where('nomor_sesi', $currentSession)
-                ->get()->getRowArray();
+            $sessionStatus = $this->sessionStatusModel->getStatus($authUser['id_user'] ?? '', $currentSession);
         }
 
         $timeLeftSeconds = $sessionDuration * 60;
         if ($sessionStatus) {
             if (!$sessionStatus['waktu_mulai'] && $existingSession && $existingSession['started_at']) {
                 // If main test has started but this session hasn't, start it now
-                $db->table('status_sesi_peserta')
-                    ->where('id_status', $sessionStatus['id_status'])
-                    ->update([
-                        'waktu_mulai' => date('Y-m-d H:i:s'),
-                        'status_sesi' => 'berjalan'
-                    ]);
+                $this->sessionStatusModel->update($sessionStatus['id_status'], [
+                    'waktu_mulai' => date('Y-m-d H:i:s'),
+                    'status_sesi' => 'berjalan'
+                ]);
                 $sessionStatus['waktu_mulai'] = date('Y-m-d H:i:s');
                 $sessionStatus['status_sesi'] = 'berjalan';
             }
@@ -191,12 +200,10 @@ class Home extends BaseController
      */
     private function getQuestions(int $session = 1): array
     {
-        $db = \Config\Database::connect();
-        $results = $db->table("pertanyaan_sesi_$session")
+        $results = $this->sessionQuestionModel->setSession($session)
             ->where('status_pertanyaan', 'Aktif')
             ->orderBy('urutan_pertanyaan', 'ASC')
-            ->get()
-            ->getResultArray();
+            ->findAll();
 
         $questions = [];
         $optionLetters = range('a', 'h');
@@ -252,11 +259,9 @@ class Home extends BaseController
 
     private function getAnswers(int $session, string $idPegawai): array
     {
-        $db = \Config\Database::connect();
-        $results = $db->table("jawaban_sesi_$session")
+        $results = $this->sessionAnswerModel->setSession($session)
             ->where('id_pegawai', $idPegawai)
-            ->get()
-            ->getResultArray();
+            ->findAll();
         
         $answers = [];
         foreach ($results as $row) {
@@ -275,8 +280,7 @@ class Home extends BaseController
             return $this->response->setJSON(['blocked' => false]);
         }
 
-        $db = \Config\Database::connect();
-        $builder = $db->table('peserta');
+        $builder = $this->participantModel->builder();
 
         $builder->groupStart();
         if ($name !== '') {
@@ -291,11 +295,7 @@ class Home extends BaseController
 
         $blocked = $builder->get()->getRowArray();
 
-        if ($blocked) {
-            return $this->response->setJSON(['blocked' => true]);
-        }
-
-        return $this->response->setJSON(['blocked' => false]);
+        return $this->response->setJSON(['blocked' => (bool)$blocked]);
     }
 
     public function completeSession()
@@ -308,7 +308,6 @@ class Home extends BaseController
             return $this->response->setJSON(['ok' => false, 'message' => 'Session ID required']);
         }
 
-        $db = \Config\Database::connect();
         $idUser = $this->authUser()['id_user'] ?? '';
         
         // Backend validation: Ensure all questions are answered
@@ -320,29 +319,28 @@ class Home extends BaseController
         }
 
         // Update status for current session
-        $db->table('status_sesi_peserta')
-            ->where('id_pegawai', $idUser)
+        $this->sessionStatusModel->where('id_pegawai', $idUser)
             ->where('nomor_sesi', $currentSession)
-            ->update([
+            ->set([
                 'status_sesi' => 'selesai',
                 'tanggal_selesai' => date('Y-m-d H:i:s'),
                 'waktu_sisa' => 0
-            ]);
+            ])->update();
 
         if ($currentSession < 3) {
             $nextSession = $currentSession + 1;
-            $db->table('peserta')->where('session_id', $sessionId)->update([
+            $this->participantModel->where('session_id', $sessionId)->set([
                 'current_session' => $nextSession,
                 'status' => 'active', 
                 'answers' => null, 
                 'current_question' => 0,
-            ]);
+            ])->update();
 
             // Initialize next session status
-            $sessionSetting = $db->table('pengaturan_sesi')->where('id_sesi', $nextSession)->get()->getRowArray();
+            $sessionSetting = $this->sessionSettingModel->getBySessionNumber($nextSession);
             $nextDuration = (int) ($sessionSetting['durasi_menit'] ?? 10);
 
-            $db->table('status_sesi_peserta')->insert([
+            $this->sessionStatusModel->insert([
                 'id_pegawai' => $idUser,
                 'nomor_sesi' => $nextSession,
                 'durasi_menit' => $nextDuration,
@@ -352,7 +350,7 @@ class Home extends BaseController
 
             return $this->response->setJSON(['ok' => true, 'next' => true, 'session' => $nextSession]);
         } else {
-            $existing = $db->table('peserta')->where('session_id', $sessionId)->get()->getRowArray();
+            $existing = $this->participantModel->getBySessionId($sessionId);
             $startedAt = $existing['started_at'] ?? date('Y-m-d H:i:s');
             $endedAt = date('Y-m-d H:i:s');
             
@@ -360,11 +358,12 @@ class Home extends BaseController
             $end = strtotime($endedAt);
             $durationSeconds = $end - $start;
 
-            $db->table('peserta')->where('session_id', $sessionId)->update([
+            $this->participantModel->where('session_id', $sessionId)->set([
                 'status' => 'completed',
                 'ended_at' => $endedAt,
                 'durasi_total_detik' => $durationSeconds
-            ]);
+            ])->update();
+            
             return $this->response->setJSON([
                 'ok' => true, 
                 'next' => false,
@@ -391,20 +390,18 @@ class Home extends BaseController
 
     private function getSummaryData($idUser, $sessionId)
     {
-        $db = \Config\Database::connect();
-        
         $totalQuestions = 0;
         $totalAnswered = 0;
         
         for ($i = 1; $i <= 3; $i++) {
-            $totalQuestions += $db->table("pertanyaan_sesi_$i")->where('status_pertanyaan', 'Aktif')->countAllResults();
-            $totalAnswered += $db->table("jawaban_sesi_$i")->where('id_pegawai', $idUser)->countAllResults();
+            $totalQuestions += $this->sessionQuestionModel->setSession($i)->where('status_pertanyaan', 'Aktif')->countAllResults();
+            $totalAnswered += $this->sessionAnswerModel->setSession($i)->where('id_pegawai', $idUser)->countAllResults();
         }
 
-        $peserta = $db->table('peserta')->where('session_id', $sessionId)->get()->getRowArray();
+        $peserta = $this->participantModel->getBySessionId($sessionId);
         $durationSeconds = (int) ($peserta['durasi_total_detik'] ?? 0);
         
-        $violations = $db->table('log_pelanggaran')->where('id_pegawai', $idUser)->countAllResults();
+        $violations = $this->violationLogModel->countByPegawai($idUser);
 
         // Format duration
         $h = floor($durationSeconds / 3600);
@@ -425,6 +422,7 @@ class Home extends BaseController
             'violations' => $violations
         ];
     }
+
     public function saveAnswer()
     {
         $json = $this->request->getJSON();
@@ -439,13 +437,7 @@ class Home extends BaseController
             return $this->response->setJSON(['ok' => false, 'message' => 'Invalid data']);
         }
 
-        $db = \Config\Database::connect();
-        
-        // Get correct answer from pertanyaan_sesi_X
-        $q = $db->table("pertanyaan_sesi_$session")
-            ->where('id_pertanyaan', $idPertanyaan)
-            ->get()
-            ->getRowArray();
+        $q = $this->sessionQuestionModel->setSession($session)->find($idPertanyaan);
         
         if (!$q) {
             return $this->response->setJSON(['ok' => false, 'message' => 'Question not found']);
@@ -467,18 +459,15 @@ class Home extends BaseController
             'tanggal_menjawab' => date('Y-m-d H:i:s'),
         ];
 
-        $existing = $db->table("jawaban_sesi_$session")
+        $existing = $this->sessionAnswerModel->setSession($session)
             ->where('id_pegawai', $idPegawai)
             ->where('id_pertanyaan', $idPertanyaan)
-            ->get()
-            ->getRowArray();
+            ->first();
 
         if ($existing) {
-            $db->table("jawaban_sesi_$session")
-                ->where('id_jawaban', $existing['id_jawaban'])
-                ->update($data);
+            $this->sessionAnswerModel->setSession($session)->update($existing['id_jawaban'], $data);
         } else {
-            $db->table("jawaban_sesi_$session")->insert($data);
+            $this->sessionAnswerModel->setSession($session)->insert($data);
         }
 
         return $this->response->setJSON(['ok' => true]);

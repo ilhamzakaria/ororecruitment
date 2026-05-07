@@ -2,17 +2,40 @@
 
 namespace App\Libraries;
 
-use CodeIgniter\Database\BaseConnection;
+use App\Models\ParticipantModel;
+use App\Models\SessionQuestionModel;
+use App\Models\SessionAnswerModel;
+use App\Models\SessionStatusModel;
+use App\Models\SessionSettingModel;
+use App\Models\ViolationModel;
+use App\Models\ViolationLogModel;
 use DateTimeImmutable;
-use DateTimeInterface;
 use InvalidArgumentException;
 use Throwable;
 
 class InterviewMonitorStore
 {
+    protected ParticipantModel $participantModel;
+    protected SessionQuestionModel $questionModel;
+    protected SessionAnswerModel $answerModel;
+    protected SessionStatusModel $statusModel;
+    protected SessionSettingModel $settingModel;
+    protected ViolationModel $violationModel;
+    protected ViolationLogModel $violationLogModel;
+
+    public function __construct()
+    {
+        $this->participantModel = new ParticipantModel();
+        $this->questionModel = new SessionQuestionModel();
+        $this->answerModel = new SessionAnswerModel();
+        $this->statusModel = new SessionStatusModel();
+        $this->settingModel = new SessionSettingModel();
+        $this->violationModel = new ViolationModel();
+        $this->violationLogModel = new ViolationLogModel();
+    }
+
     /**
      * @param array<string, mixed> $payload
-     *
      * @return array<string, mixed>
      */
     public function recordEvent(array $payload): array
@@ -22,15 +45,10 @@ class InterviewMonitorStore
             throw new InvalidArgumentException('sessionId wajib diisi.');
         }
 
-        $db = $this->db();
-        if ($db === null) {
-            return [];
-        }
-
         $eventAt = $this->normalizeTimestamp($payload['occurredAt'] ?? null);
         $eventType = trim((string) ($payload['eventType'] ?? 'unknown'));
 
-        $session = $db->table('peserta')->where('session_id', $sessionId)->get()->getRowArray();
+        $session = $this->participantModel->getBySessionId($sessionId);
         
         $data = [
             'id_user'          => $this->pickString($payload, 'idUser', (string) ($session['id_user'] ?? '')),
@@ -81,27 +99,25 @@ class InterviewMonitorStore
         }
 
         if ($session) {
-            $db->table('peserta')->where('session_id', $sessionId)->update($data);
+            $this->participantModel->update($session['id'], $data);
         } else {
             $data['session_id'] = $sessionId;
-            $db->table('peserta')->insert($data);
+            $this->participantModel->insert($data);
         }
 
-        // Save to jawaban_pegawai if completed or incrementally
         if (isset($payload['answers']) && is_array($payload['answers'])) {
-            $this->saveDetailedAnswers($db, $payload, $data);
+            $this->saveDetailedAnswers($payload, $data);
         }
 
         if ($eventType === 'violation_detected') {
-            $db->table('pelanggaran')->insert([
+            $this->violationModel->insert([
                 'session_id'  => $sessionId,
                 'type'        => trim((string) ($payload['violationType'] ?? 'general')),
                 'message'     => trim((string) ($payload['message'] ?? 'Pelanggaran terdeteksi.')),
                 'occurred_at' => $eventAt,
             ]);
 
-            // Also insert into log_pelanggaran for dashboard
-            $db->table('log_pelanggaran')->insert([
+            $this->violationLogModel->insert([
                 'id_pegawai'         => $data['id_user'],
                 'nama_pegawai'       => $data['candidate_name'],
                 'kode_pegawai'       => $data['session_code'],
@@ -112,7 +128,6 @@ class InterviewMonitorStore
             ]);
         }
 
-        // --- UPDATE status_sesi_peserta ---
         $idPegawai = $data['id_user'];
         $numSesi = $data['current_session'];
         
@@ -125,41 +140,26 @@ class InterviewMonitorStore
             $statusUpdate['waktu_mulai'] = $eventAt;
         }
 
-        if ($eventType === 'session_completed') {
-            $statusUpdate['status_sesi'] = 'selesai';
-            $statusUpdate['tanggal_selesai'] = $eventAt;
-            $statusUpdate['waktu_sisa'] = 0;
-        }
-
-        if ($eventType === 'session_time_up') {
+        if ($eventType === 'session_completed' || $eventType === 'session_time_up') {
             $statusUpdate['status_sesi'] = 'selesai';
             $statusUpdate['tanggal_selesai'] = $eventAt;
             $statusUpdate['waktu_sisa'] = 0;
         }
 
         if ($idPegawai && $numSesi) {
-            $exists = $db->table('status_sesi_peserta')
-                ->where('id_pegawai', $idPegawai)
-                ->where('nomor_sesi', $numSesi)
-                ->get()->getRowArray();
-            
+            $exists = $this->statusModel->getStatus($idPegawai, $numSesi);
             if ($exists) {
-                $db->table('status_sesi_peserta')
-                    ->where('id_status', $exists['id_status'])
-                    ->update($statusUpdate);
+                $this->statusModel->update($exists['id_status'], $statusUpdate);
             } else {
                 $statusUpdate['id_pegawai'] = $idPegawai;
                 $statusUpdate['nomor_sesi'] = $numSesi;
-                
-                // Get duration from pengaturan_sesi
-                $sessionSetting = $db->table('pengaturan_sesi')->where('id_sesi', $numSesi)->get()->getRowArray();
+                $sessionSetting = $this->settingModel->find($numSesi);
                 $statusUpdate['durasi_menit'] = (int) ($sessionSetting['durasi_menit'] ?? 10);
-                
-                $db->table('status_sesi_peserta')->insert($statusUpdate);
+                $this->statusModel->insert($statusUpdate);
             }
         }
 
-        return $db->table('peserta')->where('session_id', $sessionId)->get()->getRowArray() ?? [];
+        return $this->participantModel->getBySessionId($sessionId) ?? [];
     }
 
     /**
@@ -167,27 +167,15 @@ class InterviewMonitorStore
      */
     public function getDashboardData(): array
     {
-        $db = $this->db();
-        if ($db === null) {
-            return $this->emptyDashboard();
-        }
-
         try {
-            $sessions = $db->table('peserta')
-                ->orderBy('updated_at', 'DESC')
-                ->get()
-                ->getResultArray();
+            $sessions = $this->participantModel->orderBy('updated_at', 'DESC')->findAll();
+            $violations = $this->violationLogModel->orderBy('tanggal_pelanggaran', 'DESC')->findAll();
 
-            $violations = $db->table('log_pelanggaran')
-                ->orderBy('tanggal_pelanggaran', 'DESC')
-                ->get()
-                ->getResultArray();
-
-            $totalViolations = $db->table('peserta')->selectSum('violations_count')->get()->getRowArray()['violations_count'] ?? 0;
-            $lockedSessions = $db->table('peserta')->where('status', 'locked')->countAllResults();
-            $activeSessions = $db->table('peserta')->where('status', 'active')->countAllResults();
-            $completedSessions = $db->table('peserta')->whereIn('status', ['completed', 'time_up'])->countAllResults();
-            $blockedCandidates = $db->table('peserta')->where('is_blocked', true)->countAllResults();
+            $totalViolations = $this->participantModel->selectSum('violations_count')->first()['violations_count'] ?? 0;
+            $lockedSessions = $this->participantModel->where('status', 'locked')->countAllResults();
+            $activeSessions = $this->participantModel->where('status', 'active')->countAllResults();
+            $completedSessions = $this->participantModel->whereIn('status', ['completed', 'time_up'])->countAllResults();
+            $blockedCandidates = $this->participantModel->where('is_blocked', true)->countAllResults();
 
             return [
                 'summary' => [
@@ -213,7 +201,7 @@ class InterviewMonitorStore
                         'lastMessage'      => $s['last_message'],
                         'answers'          => $s['answers'] ? json_decode($s['answers'], true) : [],
                         'startedAt'        => $s['started_at'],
-                        'testDuration'     => (int) $s['test_duration'],
+                        'testDuration'     => (int) $s['durasi_total_detik'],
                         'updatedAt'        => $s['updated_at'],
                     ];
                 }, $sessions),
@@ -236,17 +224,6 @@ class InterviewMonitorStore
         }
     }
 
-    private function db(): ?BaseConnection
-    {
-        try {
-            $db = db_connect();
-            $db->initialize();
-            return $db;
-        } catch (Throwable) {
-            return null;
-        }
-    }
-
     private function emptyDashboard(): array
     {
         return [
@@ -264,9 +241,6 @@ class InterviewMonitorStore
         ];
     }
 
-    /**
-     * @param array<string, mixed> $payload
-     */
     private function pickString(array $payload, string $key, string $fallback): string
     {
         $value = trim((string) ($payload[$key] ?? ''));
@@ -292,22 +266,18 @@ class InterviewMonitorStore
         return (new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
     }
 
-    /**
-     * Save answers to session-specific answer table
-     */
-    private function saveDetailedAnswers($db, $payload, $sessionData): void
+    private function saveDetailedAnswers(array $payload, $sessionData): void
     {
         $idPegawai = $sessionData['id_user'] ?? '';
         $namaPegawai = $sessionData['candidate_name'] ?? '';
         $currentSession = (int) ($payload['currentSession'] ?? ($sessionData['current_session'] ?? 1));
         $answers = $payload['answers'];
 
-        $qTable = "pertanyaan_sesi_$currentSession";
-        $aTable = "jawaban_sesi_$currentSession";
+        $this->questionModel->setSession($currentSession);
+        $this->answerModel->setSession($currentSession);
 
         foreach ($answers as $idPertanyaan => $jawabanDipilih) {
-            // Get correct answer from session-specific question table
-            $q = $db->table($qTable)->where('id_pertanyaan', $idPertanyaan)->get()->getRowArray();
+            $q = $this->questionModel->find($idPertanyaan);
             if (!$q) continue;
 
             $jawabanBenar = $q['jawaban_benar'];
@@ -326,18 +296,14 @@ class InterviewMonitorStore
                 'tanggal_menjawab' => $this->nowIso(),
             ];
 
-            // Check if already answered in this session
-            $existing = $db->table($aTable)
-                ->where('id_pertanyaan', $idPertanyaan)
+            $existing = $this->answerModel->where('id_pertanyaan', $idPertanyaan)
                 ->where('id_pegawai', $idPegawai)
-                ->get()->getRowArray();
+                ->first();
 
             if ($existing) {
-                $db->table($aTable)
-                    ->where('id_jawaban', $existing['id_jawaban'])
-                    ->update($dataJawaban);
+                $this->answerModel->update($existing['id_jawaban'], $dataJawaban);
             } else {
-                $db->table($aTable)->insert($dataJawaban);
+                $this->answerModel->insert($dataJawaban);
             }
         }
     }

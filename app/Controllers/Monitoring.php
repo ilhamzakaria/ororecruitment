@@ -3,16 +3,25 @@
 namespace App\Controllers;
 
 use App\Libraries\InterviewMonitorStore;
+use App\Models\ParticipantModel;
+use App\Models\SessionAnswerModel;
+use App\Models\SessionQuestionModel;
 use InvalidArgumentException;
 use Throwable;
 
 class Monitoring extends BaseController
 {
     private InterviewMonitorStore $store;
+    protected ParticipantModel $participantModel;
+    protected SessionAnswerModel $sessionAnswerModel;
+    protected SessionQuestionModel $sessionQuestionModel;
 
     public function __construct()
     {
         $this->store = new InterviewMonitorStore();
+        $this->participantModel = new ParticipantModel();
+        $this->sessionAnswerModel = new SessionAnswerModel();
+        $this->sessionQuestionModel = new SessionQuestionModel();
     }
 
     public function dashboard()
@@ -57,16 +66,22 @@ class Monitoring extends BaseController
 
     private function getAnswersReport()
     {
-        $db = \Config\Database::connect();
-        
         // We need to find all employees across all 3 session answer tables
         $allPegawai = [];
         for ($i = 1; $i <= 3; $i++) {
-            $emps = $db->table("jawaban_sesi_$i")
-                ->select('id_pegawai, nama_pegawai, MAX(tanggal_menjawab) as terakhir')
-                ->groupBy('id_pegawai, nama_pegawai')
-                ->get()
-                ->getResultArray();
+            $this->sessionAnswerModel->setSession($i);
+            $table = $this->sessionAnswerModel->getTable();
+
+            // Defensive check
+            $db = \Config\Database::connect();
+            if (!$db->tableExists($table)) {
+                continue;
+            }
+
+            $emps = $this->sessionAnswerModel
+                ->select("$table.id_pegawai, $table.nama_pegawai, MAX($table.tanggal_menjawab) as terakhir")
+                ->groupBy("$table.id_pegawai, $table.nama_pegawai")
+                ->findAll();
             
             foreach ($emps as $e) {
                 $id = $e['id_pegawai'];
@@ -101,17 +116,31 @@ class Monitoring extends BaseController
                 $qTable = "pertanyaan_sesi_$i";
                 $aTable = "jawaban_sesi_$i";
 
-                $totalSoalSesi = $db->table($qTable)->where('status_pertanyaan', 'Aktif')->countAllResults();
-                $answersSesi = $db->table("$aTable as j")
-                    ->select('j.*, p.isi_pertanyaan, p.tipe_pertanyaan, p.gambar_pertanyaan, 
+                // Check if table exists to avoid crash
+                $db = \Config\Database::connect();
+                if (!$db->tableExists($aTable) || !$db->tableExists($qTable)) {
+                    $sessionStats["sesi_$i"] = [
+                        'total_soal' => 0,
+                        'terjawab' => 0,
+                        'benar' => 0,
+                        'salah' => 0,
+                        'nilai' => 0
+                    ];
+                    continue;
+                }
+
+                $totalSoalSesi = $this->sessionQuestionModel->setSession($i)->where('status_pertanyaan', 'Aktif')->countAllResults();
+                
+                $this->sessionAnswerModel->setSession($i);
+                $answersSesi = $this->sessionAnswerModel
+                    ->select("$aTable.*, p.isi_pertanyaan, p.tipe_pertanyaan, p.gambar_pertanyaan, 
                              p.pilihan_a, p.pilihan_b, p.pilihan_c, p.pilihan_d, p.pilihan_e,
                              p.gambar_pilihan_a, p.gambar_pilihan_b, p.gambar_pilihan_c, p.gambar_pilihan_d, p.gambar_pilihan_e,
-                             p.tipe_pilihan_a, p.tipe_pilihan_b, p.tipe_pilihan_c, p.tipe_pilihan_d, p.tipe_pilihan_e')
-                    ->join("$qTable as p", 'p.id_pertanyaan = j.id_pertanyaan', 'left')
-                    ->where('j.id_pegawai', $id)
-                    ->orderBy('j.nomor_pertanyaan', 'ASC')
-                    ->get()
-                    ->getResultArray();
+                             p.tipe_pilihan_a, p.tipe_pilihan_b, p.tipe_pilihan_c, p.tipe_pilihan_d, p.tipe_pilihan_e")
+                    ->join("$qTable as p", "p.id_pertanyaan = $aTable.id_pertanyaan", 'left')
+                    ->where("$aTable.id_pegawai", $id)
+                    ->orderBy("$aTable.nomor_pertanyaan", 'ASC')
+                    ->findAll();
 
                 $benarSesi = 0;
                 $nilaiSesi = 0;
@@ -140,12 +169,10 @@ class Monitoring extends BaseController
             }
 
             // Get latest status from peserta table
-            $peserta = $db->table('peserta')
+            $peserta = $this->participantModel
                 ->where('id_user', $id)
                 ->orderBy('updated_at', 'DESC')
-                ->limit(1)
-                ->get()
-                ->getRowArray();
+                ->first();
 
             $report[] = [
                 'id_pegawai' => $id,
@@ -229,14 +256,13 @@ class Monitoring extends BaseController
             return $this->response->setStatusCode(400)->setJSON(['ok' => false, 'message' => 'Missing session ID']);
         }
 
-        $db = \Config\Database::connect();
-        $db->table('peserta')->where('session_id', $sessionId)->update([
+        $this->participantModel->where('session_id', $sessionId)->set([
             'is_blocked' => 0,
             'status' => 'active',
             'violations_count' => 0,
             'tab_switches' => 0,
             'last_message' => 'Blokir dibuka oleh Manager/HRD',
-        ]);
+        ])->update();
 
         return $this->response->setJSON(['ok' => true]);
     }
