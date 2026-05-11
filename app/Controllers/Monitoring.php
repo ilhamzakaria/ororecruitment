@@ -25,11 +25,15 @@ class Monitoring extends BaseController
 
         $dashboard = $this->store->getDashboardData();
 
+        $db = \Config\Database::connect();
+        $sessionControl = $db->table('kontrol_sesi_pegawai')->get()->getResultArray();
+
         return view('hrd_dashboard', [
             'summary' => $dashboard['summary'],
             'sessions' => $dashboard['sessions'],
             'recentViolations' => $dashboard['recentViolations'],
             'answersReport' => $this->getAnswersReport(),
+            'sessionControl' => $sessionControl,
             'updatedAt' => $dashboard['updatedAt'],
             'dashboardDataUrl' => site_url('dashboard-hrd/data'),
             'interviewUrl' => site_url('tes-interview'),
@@ -49,9 +53,24 @@ class Monitoring extends BaseController
                 ]);
         }
 
+        $db = \Config\Database::connect();
+        $activityLogs = $db->table('log_aktivitas_tes')
+            ->orderBy('waktu_lengkap', 'DESC')
+            ->limit(50)
+            ->get()
+            ->getResultArray();
+
+        $sessionControl = $db->table('kontrol_sesi_pegawai')
+            ->get()
+            ->getResultArray();
+
         return $this->response->setJSON(array_merge(
             $this->store->getDashboardData(),
-            ['answersReport' => $this->getAnswersReport()]
+            [
+                'answersReport' => $this->getAnswersReport(),
+                'activityLogs' => $activityLogs,
+                'sessionControl' => $sessionControl,
+            ]
         ));
     }
 
@@ -157,6 +176,7 @@ class Monitoring extends BaseController
                 'salah' => $salahAll,
                 'nilai_akhir' => $nilaiAkhirAll,
                 'status_tes' => $peserta['status'] ?? 'Selesai',
+                'violations' => (int) ($peserta['violations_count'] ?? 0),
                 'current_session' => $peserta['current_session'] ?? 1,
                 'session_stats' => $sessionStats,
                 'detail' => $allDetails
@@ -168,7 +188,7 @@ class Monitoring extends BaseController
 
     public function recordEvent()
     {
-        if (! $this->authAllows(['hrd', 'pegawai'])) {
+        if (! $this->authAllows(['hrd', 'pegawai', 'manager'])) {
             return $this->response
                 ->setStatusCode(401)
                 ->setJSON([
@@ -216,6 +236,251 @@ class Monitoring extends BaseController
                     'message' => 'Event monitoring gagal disimpan.',
                 ]);
         }
+    }
+
+    public function getActivityLogs()
+    {
+        if (! $this->authAllows(['hrd', 'manager'])) {
+            return $this->response->setStatusCode(403)->setJSON(['ok' => false]);
+        }
+
+        $nama = $this->request->getGet('nama');
+        $sesi = $this->request->getGet('sesi');
+        $tanggal = $this->request->getGet('tanggal');
+        $aktivitas = $this->request->getGet('aktivitas');
+
+        $db = \Config\Database::connect();
+        $builder = $db->table('log_aktivitas_tes');
+
+        if ($nama) $builder->like('nama_pegawai', $nama);
+        if ($sesi) $builder->where('nomor_sesi', $sesi);
+        if ($tanggal) $builder->where('tanggal_aktivitas', $tanggal);
+        if ($aktivitas) $builder->where('aktivitas', $aktivitas);
+
+        $logs = $builder->orderBy('waktu_lengkap', 'DESC')->get()->getResultArray();
+
+        return $this->response->setJSON(['ok' => true, 'logs' => $logs]);
+    }
+
+    public function openSession()
+    {
+        if (! $this->authAllows(['hrd', 'manager'])) {
+            return $this->response->setStatusCode(403)->setJSON(['ok' => false, 'message' => 'Unauthorized']);
+        }
+
+        $idPegawai = $this->request->getPost('idPegawai');
+        $namaPegawai = $this->request->getPost('namaPegawai');
+        $nomorSesi = (int) $this->request->getPost('nomorSesi');
+
+        if (!$idPegawai || !$nomorSesi) {
+            return $this->response->setJSON(['ok' => false, 'message' => 'Data tidak lengkap']);
+        }
+
+        $db = \Config\Database::connect();
+        $authUser = $this->authUser();
+
+        $data = [
+            'id_pegawai' => $idPegawai,
+            'nama_pegawai' => $namaPegawai,
+            'nomor_sesi' => $nomorSesi,
+            'status_sesi' => 'dibuka',
+            'dibuka_oleh' => $authUser['name'] ?? $authUser['id_user'],
+            'role_pembuka' => $authUser['role'],
+            'tanggal_dibuka' => date('Y-m-d'),
+            'waktu_dibuka' => date('H:i:s'),
+        ];
+
+        $existing = $db->table('kontrol_sesi_pegawai')
+            ->where('id_pegawai', $idPegawai)
+            ->where('nomor_sesi', $nomorSesi)
+            ->get()->getRowArray();
+
+        if ($existing) {
+            $db->table('kontrol_sesi_pegawai')
+                ->where('id_kontrol', $existing['id_kontrol'])
+                ->update($data);
+        } else {
+            $db->table('kontrol_sesi_pegawai')->insert($data);
+        }
+
+        // Also reset status_sesi_peserta to ensure timer starts fresh
+        $sessionSetting = $db->table('pengaturan_sesi')->where('id_sesi', $nomorSesi)->get()->getRowArray();
+        $duration = (int) ($sessionSetting['durasi_menit'] ?? 10);
+        
+        $statusData = [
+            'status_sesi' => 'belum_mulai',
+            'waktu_mulai' => null,
+            'tanggal_selesai' => null,
+            'waktu_sisa' => $duration * 60,
+            'durasi_menit' => $duration
+        ];
+
+        $existsStatus = $db->table('status_sesi_peserta')
+            ->where('id_pegawai', $idPegawai)
+            ->where('nomor_sesi', $nomorSesi)
+            ->get()->getRowArray();
+
+        if ($existsStatus) {
+            $db->table('status_sesi_peserta')
+                ->where('id_status', $existsStatus['id_status'])
+                ->update($statusData);
+        } else {
+            $statusData['id_pegawai'] = $idPegawai;
+            $statusData['nomor_sesi'] = $nomorSesi;
+            $db->table('status_sesi_peserta')->insert($statusData);
+        }
+
+        return $this->response->setJSON(['ok' => true, 'message' => "Sesi $nomorSesi dibuka untuk $namaPegawai"]);
+    }
+
+    public function bulkOpenSessions()
+    {
+        if (! $this->authAllows(['hrd', 'manager'])) {
+            return $this->response->setStatusCode(403)->setJSON(['ok' => false, 'message' => 'Unauthorized']);
+        }
+
+        $userIds = $this->request->getPost('userIds'); // Array of IDs
+        $nomorSesi = (int) $this->request->getPost('nomorSesi');
+
+        if (! $userIds || ! is_array($userIds) || ! $nomorSesi) {
+            return $this->response->setStatusCode(400)->setJSON(['ok' => false, 'message' => 'Data tidak lengkap atau format salah.']);
+        }
+
+        $db = \Config\Database::connect();
+        $authUser = $this->authUser();
+        $now = date('Y-m-d H:i:s');
+        $date = date('Y-m-d');
+        $time = date('H:i:s');
+
+        $sessionSetting = $db->table('pengaturan_sesi')->where('id_sesi', $nomorSesi)->get()->getRowArray();
+        $duration = (int) ($sessionSetting['durasi_menit'] ?? 10);
+
+        $successCount = 0;
+        foreach ($userIds as $idPegawai) {
+            // Get employee name
+            $pegawai = $db->table('users')->where('id', $idPegawai)->get()->getRowArray();
+            if (!$pegawai) continue;
+            
+            $namaPegawai = $pegawai['name'] ?? 'User';
+
+            // 1. Update/Insert kontrol_sesi_pegawai
+            $existsKontrol = $db->table('kontrol_sesi_pegawai')
+                ->where('id_pegawai', $idPegawai)
+                ->where('nomor_sesi', $nomorSesi)
+                ->get()->getRowArray();
+
+            $kontrolData = [
+                'status_sesi' => 'dibuka',
+                'dibuka_oleh' => $authUser['name'] ?? 'System',
+                'role_pembuka' => $authUser['role'] ?? 'hrd',
+                'tanggal_dibuka' => $date,
+                'waktu_dibuka' => $time,
+                'nama_pegawai' => $namaPegawai
+            ];
+
+            if ($existsKontrol) {
+                $db->table('kontrol_sesi_pegawai')->where('id_kontrol', $existsKontrol['id_kontrol'])->update($kontrolData);
+            } else {
+                $kontrolData['id_pegawai'] = $idPegawai;
+                $kontrolData['nomor_sesi'] = $nomorSesi;
+                $db->table('kontrol_sesi_pegawai')->insert($kontrolData);
+            }
+
+            // 2. Reset status_sesi_peserta
+            $statusData = [
+                'status_sesi' => 'belum_mulai',
+                'waktu_mulai' => null,
+                'tanggal_selesai' => null,
+                'waktu_sisa' => $duration * 60,
+                'durasi_menit' => $duration
+            ];
+
+            $existsStatus = $db->table('status_sesi_peserta')
+                ->where('id_pegawai', $idPegawai)
+                ->where('nomor_sesi', $nomorSesi)
+                ->get()->getRowArray();
+
+            if ($existsStatus) {
+                $db->table('status_sesi_peserta')->where('id_status', $existsStatus['id_status'])->update($statusData);
+            } else {
+                $statusData['id_pegawai'] = $idPegawai;
+                $statusData['nomor_sesi'] = $nomorSesi;
+                $db->table('status_sesi_peserta')->insert($statusData);
+            }
+            
+            $successCount++;
+        }
+
+        return $this->response->setJSON([
+            'ok' => true, 
+            'message' => "Sesi $nomorSesi berhasil dibuka untuk $successCount pegawai terpilih."
+        ]);
+    }
+
+    public function bulkCloseSessions()
+    {
+        if (! $this->authAllows(['hrd', 'manager'])) {
+            return $this->response->setStatusCode(403)->setJSON(['ok' => false, 'message' => 'Unauthorized']);
+        }
+
+        $userIds = $this->request->getPost('userIds');
+        $nomorSesi = (int) $this->request->getPost('nomorSesi');
+
+        if (! $userIds || ! is_array($userIds) || ! $nomorSesi) {
+            return $this->response->setStatusCode(400)->setJSON(['ok' => false, 'message' => 'Data tidak lengkap atau format salah.']);
+        }
+
+        $db = \Config\Database::connect();
+        $successCount = 0;
+
+        foreach ($userIds as $idPegawai) {
+            $existingControl = $db->table('kontrol_sesi_pegawai')
+                ->where('id_pegawai', $idPegawai)
+                ->where('nomor_sesi', $nomorSesi)
+                ->get()
+                ->getRowArray();
+
+            if (! $existingControl) {
+                continue;
+            }
+
+            $db->table('kontrol_sesi_pegawai')
+                ->where('id_kontrol', $existingControl['id_kontrol'])
+                ->update([
+                    'status_sesi' => 'belum_dibuka',
+                ]);
+
+            $successCount++;
+        }
+
+        return $this->response->setJSON([
+            'ok' => true,
+            'message' => "Sesi $nomorSesi berhasil ditutup untuk $successCount pegawai terpilih."
+        ]);
+    }
+
+    public function manageSessions()
+    {
+        helper('url');
+        if (! $this->authAllows(['hrd', 'manager'])) {
+            return redirect()->to(site_url('login'));
+        }
+
+        $db = \Config\Database::connect();
+        
+        // Get all employees
+        $employees = $db->table('users')
+            ->where('role', 'pegawai')
+            ->get()->getResultArray();
+
+        // Get all controls to display current status
+        $controls = $db->table('kontrol_sesi_pegawai')->get()->getResultArray();
+
+        return view('manage_sessions', [
+            'employees' => $employees,
+            'controls' => $controls,
+            'authUser' => $this->authUser(),
+        ]);
     }
 
     public function unblockSession()

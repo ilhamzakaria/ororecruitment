@@ -106,7 +106,9 @@ class InterviewMonitorStore
                 'nama_pegawai'       => $data['candidate_name'],
                 'kode_pegawai'       => $data['session_code'],
                 'jenis_pelanggaran'  => trim((string) ($payload['violationType'] ?? 'general')),
+                'detail_pelanggaran' => trim((string) ($payload['message'] ?? 'Pelanggaran terdeteksi.')),
                 'jumlah_pelanggaran' => $data['violations_count'],
+                'nomor_sesi'         => $data['current_session'],
                 'status_sesi'        => $data['status'],
                 'tanggal_pelanggaran'=> $eventAt,
             ]);
@@ -120,9 +122,17 @@ class InterviewMonitorStore
             'waktu_sisa' => max(0, (int) ($payload['timeLeftSeconds'] ?? 0)),
         ];
 
-        if ($eventType === 'session_started') {
+        if ($eventType === 'session_started' || $eventType === 'fullscreen_entered') {
             $statusUpdate['status_sesi'] = 'berjalan';
-            $statusUpdate['waktu_mulai'] = $eventAt;
+            // Only set waktu_mulai if it's not already set in DB
+            $currentStatus = $db->table('status_sesi_peserta')
+                ->where('id_pegawai', $idPegawai)
+                ->where('nomor_sesi', $numSesi)
+                ->get()->getRowArray();
+            
+            if (!$currentStatus || empty($currentStatus['waktu_mulai'])) {
+                $statusUpdate['waktu_mulai'] = $eventAt;
+            }
         }
 
         if ($eventType === 'session_completed') {
@@ -157,9 +167,56 @@ class InterviewMonitorStore
                 
                 $db->table('status_sesi_peserta')->insert($statusUpdate);
             }
+
+            // --- UPDATE kontrol_sesi_pegawai ---
+            $kontrolUpdate = [];
+            if ($eventType === 'session_started' || $eventType === 'fullscreen_entered') $kontrolUpdate['status_sesi'] = 'berjalan';
+            if (in_array($eventType, ['session_completed', 'session_time_up'])) $kontrolUpdate['status_sesi'] = 'selesai';
+
+            if (!empty($kontrolUpdate)) {
+                $db->table('kontrol_sesi_pegawai')
+                    ->where('id_pegawai', $idPegawai)
+                    ->where('nomor_sesi', $numSesi)
+                    ->update($kontrolUpdate);
+            }
+        }
+
+        // --- LOG ACTIVITY ---
+        $activityMap = [
+            'session_started' => 'Mulai Sesi',
+            'answer_updated' => 'Memilih Jawaban',
+            'next_question' => 'Klik Lanjut',
+            'prev_question' => 'Klik Sebelumnya',
+            'question_viewed' => 'Membuka Soal',
+            'session_completed' => 'Submit Sesi',
+            'session_time_up' => 'Waktu Sesi Habis',
+            'violation_detected' => 'Melakukan Pelanggaran',
+            'session_locked' => 'Sesi Terkunci',
+            'fullscreen_entered' => 'Klik Fullscreen Sesi',
+            'fullscreen_exited' => 'Keluar Fullscreen',
+        ];
+
+        if (isset($activityMap[$eventType])) {
+            $this->logActivity($db, $data, $numSesi, $activityMap[$eventType], $payload['message'] ?? '');
         }
 
         return $db->table('peserta')->where('session_id', $sessionId)->get()->getRowArray() ?? [];
+    }
+
+    private function logActivity($db, $data, $numSesi, $aktivitas, $detail = '')
+    {
+        $now = new \DateTimeImmutable();
+        $db->table('log_aktivitas_tes')->insert([
+            'id_pegawai' => $data['id_user'],
+            'nama_pegawai' => $data['candidate_name'],
+            'nomor_sesi' => $numSesi,
+            'aktivitas' => $aktivitas,
+            'detail_aktivitas' => $detail,
+            'tanggal_aktivitas' => $now->format('Y-m-d'),
+            'jam_aktivitas' => (int) $now->format('H'),
+            'menit_aktivitas' => (int) $now->format('i'),
+            'waktu_lengkap' => $now->format('Y-m-d H:i:s'),
+        ]);
     }
 
     /**
@@ -222,7 +279,9 @@ class InterviewMonitorStore
                         'idLog'             => $v['id_log'],
                         'at'                => $v['tanggal_pelanggaran'],
                         'type'              => $v['jenis_pelanggaran'],
+                        'detail'            => $v['detail_pelanggaran'] ?? '',
                         'count'             => (int) $v['jumlah_pelanggaran'],
+                        'session'           => (int) ($v['nomor_sesi'] ?? 1),
                         'status'            => $v['status_sesi'],
                         'candidateName'     => $v['nama_pegawai'],
                         'idUser'            => $v['id_pegawai'],

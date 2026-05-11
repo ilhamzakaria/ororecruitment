@@ -27,6 +27,9 @@
                 <a class="nav-link <?= url_is('manage-questions') ? 'active' : '' ?>" href="<?= site_url('manage-questions') ?>">
                     <i class="bi bi-pencil-square"></i> Isi Pertanyaan
                 </a>
+                <a class="nav-link <?= url_is('manage-sessions') ? 'active' : '' ?>" href="<?= site_url('manage-sessions') ?>">
+                    <i class="bi bi-gear-fill"></i> Manajemen Soal
+                </a>
             <?php else : ?>
                 <a class="nav-link <?= url_is('dashboard-user') ? 'active' : '' ?>" href="<?= site_url('dashboard-user') ?>">
                     <i class="bi bi-house-door"></i> Dashboard
@@ -38,7 +41,7 @@
             </a>
 
             <?php if (url_is('tes-interview')) : ?>
-                <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#rulesModal">
+                <a class="nav-link" href="#" id="openInterviewRulesLink">
                     <i class="bi bi-file-earmark-text"></i> Aturan Tes
                 </a>
             <?php endif; ?>

@@ -270,7 +270,7 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
         </div>
         <div class="table-responsive">
             <table class="table">
-                <thead><tr><th>Peserta</th><th>Status</th><th>Pelanggaran</th><th>Waktu Sisa</th><th>Terakhir Update</th><th>Aksi</th></tr></thead>
+                <thead><tr><th>Peserta</th><th>Status</th><th>Pelanggaran</th><th>Sesi Aktif</th><th>Kontrol Sesi</th><th>Aksi</th></tr></thead>
                 <tbody id="sessionsTableBody"></tbody>
             </table>
         </div>
@@ -285,6 +285,42 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
         <div id="violationsPagination" class="d-flex justify-content-center mt-3 gap-1"></div>
     </aside>
 </div>
+
+<section class="card mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="card-title-custom mb-0">
+            <i class="bi bi-clock-history"></i> Log Aktivitas Tes
+        </div>
+        <div class="d-flex gap-2">
+            <input type="text" id="filterActivityPegawai" class="form-control form-control-sm" placeholder="Nama Pegawai..." style="width: 150px;">
+            <select id="filterActivitySesi" class="form-select form-select-sm" style="width: 100px;">
+                <option value="">Semua Sesi</option>
+                <option value="1">Sesi 1</option>
+                <option value="2">Sesi 2</option>
+                <option value="3">Sesi 3</option>
+            </select>
+            <input type="date" id="filterActivityTanggal" class="form-control form-control-sm" style="width: 140px;">
+            <button class="btn btn-sm btn-primary" onclick="refreshActivityLogs()"><i class="bi bi-search"></i></button>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Pegawai</th>
+                    <th>Sesi</th>
+                    <th>Aktivitas</th>
+                    <th>Detail</th>
+                    <th>Waktu Lengkap</th>
+                </tr>
+            </thead>
+            <tbody id="activityLogsTableBody">
+                <tr><td colspan="5" class="text-center py-4 text-muted">Memuat log aktivitas...</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div id="activityLogsPagination" class="d-flex justify-content-center mt-3 gap-2"></div>
+</section>
 
 <section class="card mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -312,12 +348,13 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
                     <th class="text-center">Benar</th>
                     <th class="text-center">Salah</th>
                     <th class="text-center">Nilai</th>
+                    <th class="text-center">Pelanggaran</th>
                     <th>Tanggal Tes</th>
                     <th>Aksi</th>
                 </tr>
             </thead>
             <tbody id="answersTableBody">
-                <tr><td colspan="8" class="text-center py-4 text-muted">Memuat data...</td></tr>
+                <tr><td colspan="9" class="text-center py-4 text-muted">Memuat data...</td></tr>
             </tbody>
         </table>
     </div>
@@ -363,6 +400,10 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
                     <div class="detail-summary-item">
                         <span class="detail-summary-label">Tanggal Tes</span>
                         <span class="detail-summary-value" id="modalTanggalTes">-</span>
+                    </div>
+                    <div class="detail-summary-item text-danger">
+                        <span class="detail-summary-label">Pelanggaran</span>
+                        <span class="detail-summary-value" id="modalViolations">0</span>
                     </div>
                 </div>
                 <div class="px-4 py-3">
@@ -418,15 +459,18 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
 <script>
     const dashboardDataUrl = "<?= site_url('dashboard-hrd/data') ?>";
     const initialDashboard = {
-        summary: <?= json_encode($summary) ?>,
-        sessions: <?= json_encode($sessions) ?>,
-        recentViolations: <?= json_encode($recentViolations) ?>,
+        summary: <?= json_encode($summary ?? ['totalSessions'=>0,'activeSessions'=>0,'lockedSessions'=>0,'completedSessions'=>0,'totalViolations'=>0,'blockedCandidates'=>0]) ?>,
+        sessions: <?= json_encode($sessions ?? []) ?>,
+        recentViolations: <?= json_encode($recentViolations ?? []) ?>,
         answersReport: <?= json_encode($answersReport ?? []) ?>,
+        sessionControl: <?= json_encode($sessionControl ?? []) ?>,
     };
 
     const state = {
         sessionsPage: 1,
-        violationsPage: 1
+        violationsPage: 1,
+        activityPage: 1,
+        sessionControl: initialDashboard.sessionControl || []
     };
 
     const unblockUrl = "<?= site_url('dashboard-hrd/unblock') ?>";
@@ -522,6 +566,24 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
             const isBlocked = s.blockedCandidate || s.status === 'locked';
             const rowClass = isBlocked ? 'table-danger-light' : '';
             
+            const currentSession = s.current_session || 1;
+            
+            // Find control for this employee and session
+            const control = state.sessionControl ? state.sessionControl.find(c => c.id_pegawai === s.idUser && parseInt(c.nomor_sesi) === parseInt(currentSession)) : null;
+            const controlStatus = control ? control.status_sesi : 'belum_dibuka';
+
+            let controlBtn = '';
+            if (controlStatus === 'belum_dibuka') {
+                controlBtn = `<button class="btn btn-sm btn-success w-100" onclick="openSession('${s.idUser}', '${escapeHtml(s.candidateName)}', ${currentSession})"><i class="bi bi-play-fill"></i> Mulai Sesi ${currentSession}</button>`;
+            } else {
+                const statusMap = {
+                    'dibuka': '<span class="badge bg-info text-dark w-100">DIBUKA</span>',
+                    'berjalan': '<span class="badge bg-primary w-100">SEDANG BERJALAN</span>',
+                    'selesai': '<span class="badge bg-secondary w-100">SELESAI</span>'
+                };
+                controlBtn = statusMap[controlStatus] || `<span class="badge bg-light text-dark w-100">${controlStatus.toUpperCase().replace('_', ' ')}</span>`;
+            }
+
             return `
                 <tr class="${rowClass}">
                     <td>
@@ -540,8 +602,8 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
                             ${s.violations} Event
                         </span>
                     </td>
-                    <td>${s.status === 'completed' || s.status === 'time_up' ? '<span class="text-muted">Selesai</span>' : calculateTimeLeft(s.startedAt, s.testDuration)}</td>
-                    <td class="text-muted fw-semibold">${formatDate(s.updatedAt)}</td>
+                    <td class="text-center fw-bold">Sesi ${currentSession}</td>
+                    <td style="width: 140px;">${controlBtn}</td>
                     <td>
                         ${isBlocked 
                             ? `<button class="btn btn-sm btn-danger py-1 px-2" style="font-size:12px; min-height:0; background-color: var(--danger) !important; color: white !important;" onclick="unblockSession('${s.sessionId}')"><i class="bi bi-unlock-fill"></i> Buka Blokir</button>`
@@ -636,8 +698,12 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
                         </div>
                         <span class="violation-time">${formatDate(v.at)}</span>
                     </div>
+                    <div class="mt-1 small text-dark fw-600" style="font-size:11px;">
+                        <i class="bi bi-info-circle"></i> ${escapeHtml(v.detail || 'Tidak ada detail')}
+                    </div>
                     <div class="d-flex align-items-center mt-2 flex-wrap gap-1">
-                        <span class="badge bg-light text-dark border" style="font-size:9px">${v.count}x</span>
+                        <span class="badge bg-primary" style="font-size:9px">SESI ${v.session}</span>
+                        <span class="badge bg-light text-dark border" style="font-size:9px">${v.count}x Total</span>
                         ${typeBadge}
                         ${statusBadge}
                     </div>
@@ -680,6 +746,11 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
                 <td class="text-center"><span class="badge bg-success">${s.benar}</span></td>
                 <td class="text-center"><span class="badge bg-danger">${s.salah}</span></td>
                 <td class="text-center"><strong class="text-primary">${s.nilai_akhir}</strong></td>
+                <td class="text-center">
+                    <span class="badge ${s.violations > 0 ? 'bg-danger' : 'bg-success'}">
+                        ${s.violations}
+                    </span>
+                </td>
                 <td class="text-muted small">${formatDate(s.tanggal_tes)}</td>
                 <td>
                     <button class="btn btn-sm btn-secondary py-1 px-2" style="font-size:12px; min-height:0" onclick="showDetail('${s.id_pegawai}')">
@@ -703,6 +774,7 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
         document.getElementById('modalNilai').textContent = summary.nilai_akhir;
         document.getElementById('modalStatusTes').textContent = summary.status_tes;
         document.getElementById('modalTanggalTes').textContent = formatDate(summary.tanggal_tes);
+        document.getElementById('modalViolations').textContent = summary.violations;
 
         // Session Stats
         for (let i = 1; i <= 3; i++) {
@@ -733,6 +805,33 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
                 return `<strong>${choiceKey}.</strong> ${escapeHtml(choiceText || '-')}`;
             };
 
+            if (parseInt(a.sesi) === 1) {
+                return `
+                    <div class="answer-card">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="answer-num">S${a.sesi}-Q${a.nomor_pertanyaan}</div>
+                                <span class="answer-status-badge bg-primary text-white">DISC Test</span>
+                            </div>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <div class="small fw-bold text-muted">Mirip (Most):</div>
+                                <div class="p-2 bg-success text-white rounded mt-1 border border-success">
+                                    ${renderChoice(a.jawaban_most)}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="small fw-bold text-muted">Tidak Mirip (Least):</div>
+                                <div class="p-2 bg-danger text-white rounded mt-1 border border-danger">
+                                    ${renderChoice(a.jawaban_least)}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
             const statusLabel = a.status_jawaban || 'Belum dijawab';
             const badgeClass = statusLabel === 'Benar' ? 'badge-success-alt' : (statusLabel === 'Salah' ? 'badge-danger-alt' : 'bg-warning text-dark');
             const cardBorderClass = statusLabel === 'Benar' ? 'correct' : (statusLabel === 'Salah' ? 'wrong' : '');
@@ -753,7 +852,7 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
                         <div class="col-md-6">
                             <div class="small fw-bold text-muted">Jawaban Pegawai:</div>
                             <div class="p-2 bg-light rounded mt-1 border">
-                                ${renderChoice(a.jawaban_dipilih)}
+                                ${renderChoice(a.jawaban_pegawai)}
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -779,6 +878,10 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
         el.lockedSessionsMetric.textContent = data.summary.lockedSessions;
         el.totalViolationsMetric.textContent = data.summary.totalViolations;
         
+        if (data.sessionControl) {
+            state.sessionControl = data.sessionControl;
+        }
+        
         renderSessions(data.sessions);
         renderViolations(data.recentViolations);
         
@@ -795,11 +898,106 @@ $headerSubtitle = 'Ringkasan aktivitas interview hari ini';
     async function refresh() {
         try {
             const res = await fetch(dashboardDataUrl);
-            if (res.ok) renderDashboard(await res.json());
+            if (res.ok) {
+                const data = await res.json();
+                state.sessionControl = data.sessionControl || [];
+                renderDashboard(data);
+            }
         } catch(e) {}
     }
 
+    async function refreshActivityLogs() {
+        const nama = document.getElementById('filterActivityPegawai').value;
+        const sesi = document.getElementById('filterActivitySesi').value;
+        const tanggal = document.getElementById('filterActivityTanggal').value;
+
+        try {
+            const res = await fetch(`<?= site_url('dashboard-hrd/activity-logs') ?>?nama=${nama}&sesi=${sesi}&tanggal=${tanggal}`);
+            if (res.ok) {
+                const data = await res.json();
+                renderActivityLogs(data.logs);
+            }
+        } catch (e) {}
+    }
+
+    function renderActivityLogs(logs) {
+        const pageSize = 10;
+        const totalPages = Math.ceil(logs.length / pageSize) || 1;
+        if (state.activityPage > totalPages) state.activityPage = totalPages;
+
+        const start = (state.activityPage - 1) * pageSize;
+        const paged = logs.slice(start, start + pageSize);
+
+        if (!logs.length) {
+            document.getElementById('activityLogsTableBody').innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">Tidak ada log aktivitas.</td></tr>';
+            document.getElementById('activityLogsPagination').innerHTML = '';
+            return;
+        }
+
+        document.getElementById('activityLogsTableBody').innerHTML = paged.map(l => `
+            <tr>
+                <td>
+                    <div class="fw-bold text-dark">${escapeHtml(l.nama_pegawai)}</div>
+                    <div class="small text-muted">${escapeHtml(l.id_pegawai)}</div>
+                </td>
+                <td class="text-center">Sesi ${l.nomor_sesi}</td>
+                <td><span class="badge bg-light text-dark border">${escapeHtml(l.aktivitas)}</span></td>
+                <td class="small">${escapeHtml(l.detail_aktivitas || '-')}</td>
+                <td class="text-muted small">${l.waktu_lengkap}</td>
+            </tr>
+        `).join('');
+
+        renderPagination(document.getElementById('activityLogsPagination'), state.activityPage, totalPages, (p) => {
+            state.activityPage = p;
+            renderActivityLogs(logs);
+        });
+    }
+
+    async function openSession(idPegawai, namaPegawai, nomorSesi) {
+        showCustomAlert(
+            `Apakah Anda yakin ingin membuka Sesi ${nomorSesi} untuk ${namaPegawai}?`,
+            'Buka Sesi Test',
+            {
+                showSecondary: true,
+                primaryText: 'Buka Sesi',
+                secondaryText: 'Batal',
+                icon: 'bi-play-fill',
+                onPrimary: async () => {
+                    try {
+                        const formData = new FormData();
+                        formData.append('idPegawai', idPegawai);
+                        formData.append('namaPegawai', namaPegawai);
+                        formData.append('nomorSesi', nomorSesi);
+                        
+                        const res = await fetch("<?= site_url('dashboard-hrd/open-session') ?>", {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const result = await res.json();
+                        if (result.ok) {
+                            refresh();
+                            refreshActivityLogs();
+                            setTimeout(() => {
+                                showCustomAlert(result.message, 'Sukses', {
+                                    icon: 'bi-check-circle-fill',
+                                    iconColor: 'var(--green-1)'
+                                });
+                            }, 400);
+                        }
+                    } catch(e) {}
+                }
+            }
+        );
+    }
+
+    // Initial render
     renderDashboard(initialDashboard);
-    setInterval(refresh, 8000);
+    refreshActivityLogs();
+    
+    // Auto refresh every 30 seconds
+    setInterval(() => {
+        refresh();
+        refreshActivityLogs();
+    }, 30000);
 </script>
 <?= $this->endSection() ?>

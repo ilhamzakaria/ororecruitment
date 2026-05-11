@@ -27,62 +27,79 @@ class Home extends BaseController
 
         $db = \Config\Database::connect();
         $sessionId = $defaultIdentity['sessionCode'] ?: 'SESI-' . uniqid();
+
+        $this->ensureUserInitialized($authUser, $sessionId, $db);
+
+        // Refresh existing session after initialization
         $existingSession = $db->table('peserta')->where('session_id', $sessionId)->get()->getRowArray();
-        
+        if (! $existingSession && $authUser) {
+            $existingSession = $db->table('peserta')
+                ->where('id_user', $authUser['id_user'])
+                ->orderBy('updated_at', 'DESC')
+                ->get()
+                ->getRowArray();
+        }
+
         $currentSession = (int) ($existingSession['current_session'] ?? 1);
+        
+        // Handle requested session from URL
+        $requestedSession = (int) $this->request->getGet('session');
+        if ($requestedSession && $requestedSession !== $currentSession) {
+            $allowed = false;
+            if ($requestedSession === 1) {
+                $allowed = true;
+            } else {
+                // Check if previous session is completed
+                $prevSession = $requestedSession - 1;
+                $prevStatus = $db->table('status_sesi_peserta')
+                    ->where('id_pegawai', $authUser['id_user'] ?? '')
+                    ->where('nomor_sesi', $prevSession)
+                    ->get()->getRowArray();
+                
+                if (($prevStatus['status_sesi'] ?? '') === 'selesai') {
+                    $allowed = true;
+                }
+            }
+
+            if ($allowed) {
+                $currentSession = $requestedSession;
+                // Sync peserta table
+                if ($existingSession) {
+                    $db->table('peserta')
+                        ->where('session_id', $sessionId)
+                        ->update(['current_session' => $currentSession]);
+                }
+            } else {
+                return redirect()->to(site_url('tes-interview'));
+            }
+        }
         
         // Get duration for current session from pengaturan_sesi
         $sessionSetting = $db->table('pengaturan_sesi')->where('id_sesi', $currentSession)->get()->getRowArray();
-        $sessionDuration = (int) ($sessionSetting['durasi_menit'] ?? 10);
+        $sessionDuration = (int) ($sessionSetting['durasi_menit'] ?? 15);
 
-        // Get or initialize status_sesi_peserta
+        // Re-fetch current session status and control after potential initialization
         $sessionStatus = $db->table('status_sesi_peserta')
             ->where('id_pegawai', $authUser['id_user'] ?? '')
             ->where('nomor_sesi', $currentSession)
             ->get()->getRowArray();
 
-        if (!$sessionStatus && $existingSession) {
-            // Initialize if not exists but main session exists
-            $db->table('status_sesi_peserta')->insert([
-                'id_pegawai' => $authUser['id_user'] ?? '',
-                'nomor_sesi' => $currentSession,
-                'durasi_menit' => $sessionDuration,
-                'waktu_sisa' => $sessionDuration * 60,
-                'status_sesi' => 'belum_mulai'
-            ]);
-            $sessionStatus = $db->table('status_sesi_peserta')
-                ->where('id_pegawai', $authUser['id_user'] ?? '')
-                ->where('nomor_sesi', $currentSession)
-                ->get()->getRowArray();
-        }
+        $sessionControl = $db->table('kontrol_sesi_pegawai')
+            ->where('id_pegawai', $authUser['id_user'] ?? '')
+            ->where('nomor_sesi', $currentSession)
+            ->get()->getRowArray();
 
-        $timeLeftSeconds = $sessionDuration * 60;
-        if ($sessionStatus) {
-            if (!$sessionStatus['waktu_mulai'] && $existingSession && $existingSession['started_at']) {
-                // If main test has started but this session hasn't, start it now
-                $db->table('status_sesi_peserta')
-                    ->where('id_status', $sessionStatus['id_status'])
-                    ->update([
-                        'waktu_mulai' => date('Y-m-d H:i:s'),
-                        'status_sesi' => 'berjalan'
-                    ]);
-                $sessionStatus['waktu_mulai'] = date('Y-m-d H:i:s');
-                $sessionStatus['status_sesi'] = 'berjalan';
+        $timeLeftSeconds = (int) ($sessionStatus['waktu_sisa'] ?? ($sessionDuration * 60));
+        if ($sessionStatus && !empty($sessionStatus['waktu_mulai']) && ($sessionStatus['status_sesi'] ?? '') === 'berjalan') {
+            $startTime = strtotime($sessionStatus['waktu_mulai']);
+            $now = time();
+            $elapsed = $now - $startTime;
+            $calcTimeLeft = ($sessionStatus['durasi_menit'] * 60) - $elapsed;
+            
+            if ($calcTimeLeft < $timeLeftSeconds) {
+                $timeLeftSeconds = $calcTimeLeft;
             }
-
-            if ($sessionStatus['waktu_mulai']) {
-                $startTime = strtotime($sessionStatus['waktu_mulai']);
-                $now = time();
-                $elapsed = $now - $startTime;
-                $timeLeftSeconds = ($sessionStatus['durasi_menit'] * 60) - $elapsed;
-                
-                // Sync with waktu_sisa if it's smaller
-                if (isset($sessionStatus['waktu_sisa']) && $sessionStatus['waktu_sisa'] < $timeLeftSeconds && $sessionStatus['waktu_sisa'] > 0) {
-                    $timeLeftSeconds = $sessionStatus['waktu_sisa'];
-                }
-
-                if ($timeLeftSeconds < 0) $timeLeftSeconds = 0;
-            }
+            if ($timeLeftSeconds < 0) $timeLeftSeconds = 0;
         }
 
         $allQuestions = [];
@@ -94,21 +111,31 @@ class Home extends BaseController
             $allAnswers[$s] = $this->getAnswers($s, $authUser['id_user'] ?? '');
         }
 
-        // Validate session access strictly
-        if ($currentSession >= 2) {
-            $s1Total = count($allQuestions[1]);
-            $s1Answered = count($allAnswers[1]);
-            if ($s1Answered < $s1Total) {
-                $currentSession = 1;
+        $allSessionStatuses = [];
+        $allSessionControls = [];
+        $sessionViolations = [1 => 0, 2 => 0, 3 => 0];
+
+        $allCompleted = true;
+        foreach ($sessions as $s) {
+            $allSessionStatuses[$s] = $db->table('status_sesi_peserta')
+                ->where('id_pegawai', $authUser['id_user'] ?? '')
+                ->where('nomor_sesi', $s)
+                ->get()->getRowArray();
+
+            $allSessionControls[$s] = $db->table('kontrol_sesi_pegawai')
+                ->where('id_pegawai', $authUser['id_user'] ?? '')
+                ->where('nomor_sesi', $s)
+                ->get()->getRowArray();
+            
+            if (($allSessionStatuses[$s]['status_sesi'] ?? '') !== 'selesai') {
+                $allCompleted = false;
             }
-        }
-        
-        if ($currentSession >= 3) {
-            $s2Total = count($allQuestions[2]);
-            $s2Answered = count($allAnswers[2]);
-            if ($s2Answered < $s2Total) {
-                $currentSession = min($currentSession, 2);
-            }
+
+            $vCount = $db->table('log_pelanggaran')
+                ->where('id_pegawai', $authUser['id_user'] ?? '')
+                ->where('nomor_sesi', $s)
+                ->countAllResults();
+            $sessionViolations[$s] = $vCount;
         }
 
         return view('interview_app', [
@@ -128,7 +155,14 @@ class Home extends BaseController
             'authUser' => $authUser,
             'defaultIdentity' => $defaultIdentity,
             'existingSession' => $existingSession,
+            'sessionId' => $sessionId,
             'currentSession' => $currentSession,
+            'sessionControl' => $sessionControl,
+            'sessionStatus' => $sessionStatus,
+            'allSessionStatuses' => $allSessionStatuses,
+            'allSessionControls' => $allSessionControls,
+            'allCompleted' => $allCompleted,
+            'sessionViolations' => $sessionViolations,
         ]);
     }
 
@@ -174,7 +208,7 @@ class Home extends BaseController
                 'candidateName' => (string) ($authUser['name'] ?? $idUser),
                 'positionName' => (string) ($authUser['positionName'] ?? ''),
                 'hrdName' => (string) ($authUser['hrdName'] ?? ''),
-                'sessionCode' => $idUser,
+                'sessionCode' => $idUser !== '' ? 'SESI-' . $idUser : '',
             ];
         }
 
@@ -260,7 +294,49 @@ class Home extends BaseController
         
         $answers = [];
         foreach ($results as $row) {
-            $answers[$row['id_pertanyaan']] = $row['jawaban_pegawai'];
+            if ($session === 1) {
+                $pairs = [];
+                $mostCsv = trim((string) ($row['jawaban_most'] ?? ''));
+                $leastCsv = trim((string) ($row['jawaban_least'] ?? ''));
+                $rawJawabanPegawai = trim((string) ($row['jawaban_pegawai'] ?? ''));
+
+                if ($rawJawabanPegawai !== '') {
+                    $decoded = json_decode($rawJawabanPegawai, true);
+                    if (is_array($decoded) && isset($decoded['pairs']) && is_array($decoded['pairs'])) {
+                        /** @var array<string, string> $pairs */
+                        $pairs = $decoded['pairs'];
+                    }
+                }
+
+                if ($pairs === []) {
+                    $mostItems = array_filter(array_map('trim', explode(',', strtoupper($mostCsv))));
+                    $leastItems = array_filter(array_map('trim', explode(',', strtoupper($leastCsv))));
+                    foreach ($mostItems as $item) {
+                        $pairs[$item] = 'most';
+                    }
+                    foreach ($leastItems as $item) {
+                        $pairs[$item] = 'least';
+                    }
+                }
+
+                $mostValues = [];
+                $leastValues = [];
+                foreach ($pairs as $opt => $pick) {
+                    if ($pick === 'most') {
+                        $mostValues[] = (string) $opt;
+                    } elseif ($pick === 'least') {
+                        $leastValues[] = (string) $opt;
+                    }
+                }
+
+                $answers[$row['id_pertanyaan']] = [
+                    'pairs' => $pairs,
+                    'most' => $mostValues,
+                    'least' => $leastValues,
+                ];
+            } else {
+                $answers[$row['id_pertanyaan']] = $row['jawaban_pegawai'];
+            }
         }
         return $answers;
     }
@@ -301,23 +377,21 @@ class Home extends BaseController
     public function completeSession()
     {
         $json = $this->request->getJSON();
-        $sessionId = $json->sessionId ?? '';
+        $sessionId = trim((string) ($json->sessionId ?? ''));
         $currentSession = (int)($json->currentSession ?? 1);
+        $idUser = (string) ($this->authUser()['id_user'] ?? '');
 
-        if ($sessionId === '') {
+        $sessionId = $this->resolveSessionId($sessionId, $idUser);
+
+        if ($sessionId === '' || $idUser === '') {
             return $this->response->setJSON(['ok' => false, 'message' => 'Session ID required']);
         }
 
         $db = \Config\Database::connect();
-        $idUser = $this->authUser()['id_user'] ?? '';
         
-        // Backend validation: Ensure all questions are answered
+        // Backend validation removed: allow partial submission
         $questions = $this->getQuestions($currentSession);
         $answers = $this->getAnswers($currentSession, $idUser);
-        
-        if (count($answers) < count($questions)) {
-            return $this->response->setJSON(['ok' => false, 'message' => 'Selesaikan semua soal pada sesi ini terlebih dahulu.']);
-        }
 
         // Update status for current session
         $db->table('status_sesi_peserta')
@@ -327,6 +401,14 @@ class Home extends BaseController
                 'status_sesi' => 'selesai',
                 'tanggal_selesai' => date('Y-m-d H:i:s'),
                 'waktu_sisa' => 0
+            ]);
+
+        // Also update kontrol_sesi_pegawai
+        $db->table('kontrol_sesi_pegawai')
+            ->where('id_pegawai', $idUser)
+            ->where('nomor_sesi', $currentSession)
+            ->update([
+                'status_sesi' => 'selesai'
             ]);
 
         if ($currentSession < 3) {
@@ -340,15 +422,45 @@ class Home extends BaseController
 
             // Initialize next session status
             $sessionSetting = $db->table('pengaturan_sesi')->where('id_sesi', $nextSession)->get()->getRowArray();
-            $nextDuration = (int) ($sessionSetting['durasi_menit'] ?? 10);
+            $nextDuration = (int) ($sessionSetting['durasi_menit'] ?? 15);
 
-            $db->table('status_sesi_peserta')->insert([
-                'id_pegawai' => $idUser,
-                'nomor_sesi' => $nextSession,
-                'durasi_menit' => $nextDuration,
-                'waktu_sisa' => $nextDuration * 60,
-                'status_sesi' => 'belum_mulai'
-            ]);
+            $existsStatus = $db->table('status_sesi_peserta')
+                ->where('id_pegawai', $idUser)
+                ->where('nomor_sesi', $nextSession)
+                ->get()->getRowArray();
+
+            if (!$existsStatus) {
+                $db->table('status_sesi_peserta')->insert([
+                    'id_pegawai' => $idUser,
+                    'nomor_sesi' => $nextSession,
+                    'durasi_menit' => $nextDuration,
+                    'waktu_sisa' => $nextDuration * 60,
+                    'status_sesi' => 'belum_mulai'
+                ]);
+            }
+
+            // Also ensure next session is OPENED in kontrol_sesi_pegawai
+            $existsKontrol = $db->table('kontrol_sesi_pegawai')
+                ->where('id_pegawai', $idUser)
+                ->where('nomor_sesi', $nextSession)
+                ->get()->getRowArray();
+            
+            if ($existsKontrol) {
+                $db->table('kontrol_sesi_pegawai')
+                    ->where('id_kontrol', $existsKontrol['id_kontrol'])
+                    ->update(['status_sesi' => 'belum_dibuka']);
+            } else {
+                $db->table('kontrol_sesi_pegawai')->insert([
+                    'id_pegawai' => $idUser,
+                    'nama_pegawai' => $this->authUser()['name'] ?? '',
+                    'nomor_sesi' => $nextSession,
+                    'status_sesi' => 'belum_dibuka',
+                    'tanggal_dibuka' => date('Y-m-d'),
+                    'waktu_dibuka' => date('H:i:s'),
+                    'dibuka_oleh' => 'System (Waiting for HRD)'
+                ]);
+            }
+
 
             return $this->response->setJSON(['ok' => true, 'next' => true, 'session' => $nextSession]);
         } else {
@@ -376,10 +488,10 @@ class Home extends BaseController
     public function getSummary()
     {
         $json = $this->request->getJSON();
-        $sessionId = $json->sessionId ?? '';
-        $idUser = $this->authUser()['id_user'] ?? '';
+        $idUser = (string) ($this->authUser()['id_user'] ?? '');
+        $sessionId = $this->resolveSessionId(trim((string) ($json->sessionId ?? '')), $idUser);
 
-        if (!$sessionId) {
+        if ($sessionId === '' || $idUser === '') {
             return $this->response->setJSON(['ok' => false]);
         }
 
@@ -425,6 +537,40 @@ class Home extends BaseController
             'violations' => $violations
         ];
     }
+
+    private function resolveSessionId(string $sessionId, string $idUser): string
+    {
+        if ($idUser === '') {
+            return trim($sessionId);
+        }
+
+        $sessionId = trim($sessionId);
+        $db = \Config\Database::connect();
+
+        if ($sessionId !== '') {
+            $exists = $db->table('peserta')
+                ->where('session_id', $sessionId)
+                ->get()
+                ->getRowArray();
+
+            if ($exists) {
+                return $sessionId;
+            }
+        }
+
+        $existingSession = $db->table('peserta')
+            ->where('id_user', $idUser)
+            ->orderBy('updated_at', 'DESC')
+            ->get()
+            ->getRowArray();
+
+        if ($existingSession && ! empty($existingSession['session_id'])) {
+            return (string) $existingSession['session_id'];
+        }
+
+        return $sessionId !== '' ? $sessionId : 'SESI-' . $idUser;
+    }
+
     public function saveAnswer()
     {
         $json = $this->request->getJSON();
@@ -434,6 +580,9 @@ class Home extends BaseController
         $idPertanyaan = (int)($json->idPertanyaan ?? 0);
         $nomorPertanyaan = (int)($json->nomorPertanyaan ?? 0);
         $jawabanPegawai = (string)($json->jawabanPegawai ?? '');
+        $jawabanMost = (string)($json->jawabanMost ?? '');
+        $jawabanLeast = (string)($json->jawabanLeast ?? '');
+        $jawabanPairs = $json->jawabanPairs ?? null;
 
         if (!$idPegawai || !$idPertanyaan) {
             return $this->response->setJSON(['ok' => false, 'message' => 'Invalid data']);
@@ -467,6 +616,50 @@ class Home extends BaseController
             'tanggal_menjawab' => date('Y-m-d H:i:s'),
         ];
 
+        if ($session === 1) {
+            $pairs = [];
+            if (is_object($jawabanPairs)) {
+                $jawabanPairs = (array) $jawabanPairs;
+            }
+            if (is_array($jawabanPairs)) {
+                foreach ($jawabanPairs as $opt => $pick) {
+                    $opt = strtoupper(trim((string) $opt));
+                    $pick = strtolower(trim((string) $pick));
+                    if ($opt === '' || ! in_array($pick, ['most', 'least'], true)) {
+                        continue;
+                    }
+                    $pairs[$opt] = $pick;
+                }
+            }
+
+            $mostValues = [];
+            $leastValues = [];
+            foreach ($pairs as $opt => $pick) {
+                if ($pick === 'most') {
+                    $mostValues[] = $opt;
+                } elseif ($pick === 'least') {
+                    $leastValues[] = $opt;
+                }
+            }
+
+            if ($pairs === []) {
+                $mostValues = array_filter(array_map('trim', explode(',', strtoupper($jawabanMost))));
+                $leastValues = array_filter(array_map('trim', explode(',', strtoupper($jawabanLeast))));
+                foreach ($mostValues as $opt) {
+                    $pairs[$opt] = 'most';
+                }
+                foreach ($leastValues as $opt) {
+                    $pairs[$opt] = 'least';
+                }
+            }
+
+            $data['jawaban_most'] = implode(',', $mostValues);
+            $data['jawaban_least'] = implode(',', $leastValues);
+            $data['jawaban_pegawai'] = json_encode(['pairs' => $pairs], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '';
+            $data['status_jawaban'] = 'Selesai';
+            $data['nilai'] = 0;
+        }
+
         $existing = $db->table("jawaban_sesi_$session")
             ->where('id_pegawai', $idPegawai)
             ->where('id_pertanyaan', $idPertanyaan)
@@ -482,5 +675,90 @@ class Home extends BaseController
         }
 
         return $this->response->setJSON(['ok' => true]);
+    }
+
+    /**
+     * Ensures all necessary database records exist for the user to participate in the interview.
+     */
+    private function ensureUserInitialized(?array $authUser, string &$sessionId, $db): void
+    {
+        $idUser = (string) ($authUser['id_user'] ?? $authUser['id'] ?? '');
+        if ($idUser === '') {
+            return;
+        }
+
+        $idUser = (string) $idUser;
+        $existing = $db->table('peserta')->where('session_id', $sessionId)->get()->getRowArray();
+        
+        if (!$existing) {
+            $existing = $db->table('peserta')
+                ->where('id_user', $idUser)
+                ->orderBy('updated_at', 'DESC')
+                ->get()
+                ->getRowArray();
+            
+            if ($existing) {
+                $sessionId = (string) ($existing['session_id'] ?? $sessionId);
+            }
+        }
+
+        // 1. Create 'peserta' if totally missing
+        if (!$existing) {
+            $db->table('peserta')->insert([
+                'session_id'       => $sessionId,
+                'id_user'          => $idUser,
+                'candidate_name'   => $authUser['name'] ?? 'Peserta',
+                'position_name'    => $authUser['positionName'] ?? 'Pegawai',
+                'hrd_name'         => 'System',
+                'session_code'     => $sessionId,
+                'status'           => 'draft',
+                'current_session'  => 1,
+                'is_blocked'       => 0,
+                'questions_total'  => 0,
+                'violations_count' => 0,
+                'tab_switches'     => 0,
+                'created_at'       => date('Y-m-d H:i:s'),
+                'updated_at'       => date('Y-m-d H:i:s'),
+            ]);
+        }
+
+        // 2. Initialize all 3 sessions
+        foreach ([1, 2, 3] as $s) {
+            // status_sesi_peserta
+            $status = $db->table('status_sesi_peserta')
+                ->where('id_pegawai', $idUser)
+                ->where('nomor_sesi', $s)
+                ->get()->getRowArray();
+            
+            if (!$status) {
+                $sSetting = $db->table('pengaturan_sesi')->where('id_sesi', $s)->get()->getRowArray();
+                $sDur = (int) ($sSetting['durasi_menit'] ?? 15);
+                $db->table('status_sesi_peserta')->insert([
+                    'id_pegawai'   => $idUser,
+                    'nomor_sesi'   => $s,
+                    'durasi_menit' => $sDur,
+                    'waktu_sisa'   => $sDur * 60,
+                    'status_sesi'  => 'belum_mulai'
+                ]);
+            }
+
+            // kontrol_sesi_pegawai
+            $control = $db->table('kontrol_sesi_pegawai')
+                ->where('id_pegawai', $idUser)
+                ->where('nomor_sesi', $s)
+                ->get()->getRowArray();
+            
+            if (!$control) {
+                $db->table('kontrol_sesi_pegawai')->insert([
+                    'id_pegawai'     => $idUser,
+                    'nama_pegawai'   => $authUser['name'] ?? 'Peserta',
+                    'nomor_sesi'     => $s,
+                    'status_sesi'    => ($s === 1) ? 'dibuka' : 'belum_dibuka',
+                    'tanggal_dibuka' => date('Y-m-d'),
+                    'waktu_dibuka'   => date('H:i:s'),
+                    'dibuka_oleh'    => 'System'
+                ]);
+            }
+        }
     }
 }

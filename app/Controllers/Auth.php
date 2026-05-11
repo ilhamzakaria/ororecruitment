@@ -79,6 +79,7 @@ class Auth extends BaseController
                     ->with('last_id_user', strtoupper(trim($idUser)));
             }
 
+            /*
             // Single login enforcement for pegawai
             if ($user['role'] === 'pegawai') {
                 // If there's already a session_id and it's different from current
@@ -89,6 +90,7 @@ class Auth extends BaseController
                         ->with('last_id_user', strtoupper(trim($idUser)));
                 }
             }
+            */
 
             $session->regenerate(true);
             $session->set('auth_user', $user);
