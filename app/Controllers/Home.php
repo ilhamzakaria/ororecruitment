@@ -389,10 +389,6 @@ class Home extends BaseController
 
         $db = \Config\Database::connect();
         
-        // Backend validation removed: allow partial submission
-        $questions = $this->getQuestions($currentSession);
-        $answers = $this->getAnswers($currentSession, $idUser);
-
         // Update status for current session
         $db->table('status_sesi_peserta')
             ->where('id_pegawai', $idUser)
@@ -590,19 +586,25 @@ class Home extends BaseController
 
         $db = \Config\Database::connect();
         
-        // Get correct answer from pertanyaan_sesi_X
-        $q = $db->table("pertanyaan_sesi_$session")
-            ->where('id_pertanyaan', $idPertanyaan)
-            ->get()
-            ->getRowArray();
-        
-        if (!$q) {
-            return $this->response->setJSON(['ok' => false, 'message' => 'Question not found']);
-        }
+        $jawabanBenar = '';
+        $statusJawaban = 'Selesai';
+        $nilai = 0;
 
-        $jawabanBenar = $q['jawaban_benar'] ?? '';
-        $statusJawaban = (strtoupper($jawabanPegawai) === strtoupper($jawabanBenar)) ? 'Benar' : 'Salah';
-        $nilai = ($statusJawaban === 'Benar') ? 1 : 0;
+        if ($session !== 1) {
+            // Get correct answer from pertanyaan_sesi_X
+            $q = $db->table("pertanyaan_sesi_$session")
+                ->where('id_pertanyaan', $idPertanyaan)
+                ->get()
+                ->getRowArray();
+            
+            if (!$q) {
+                return $this->response->setJSON(['ok' => false, 'message' => 'Question not found']);
+            }
+
+            $jawabanBenar = $q['jawaban_benar'] ?? '';
+            $statusJawaban = (strtoupper($jawabanPegawai) === strtoupper($jawabanBenar)) ? 'Benar' : 'Salah';
+            $nilai = ($statusJawaban === 'Benar') ? 1 : 0;
+        }
 
         $data = [
             'id_pegawai' => $idPegawai,
@@ -652,6 +654,12 @@ class Home extends BaseController
                     $pairs[$opt] = 'least';
                 }
             }
+
+            // --- VALIDATION START ---
+            if (count($mostValues) + count($leastValues) > 2) {
+                return $this->response->setJSON(['ok' => false, 'message' => 'Maksimal hanya boleh memilih 2 jawaban']);
+            }
+            // --- VALIDATION END ---
 
             $data['jawaban_most'] = implode(',', $mostValues);
             $data['jawaban_least'] = implode(',', $leastValues);

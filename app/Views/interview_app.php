@@ -347,54 +347,13 @@ $headerSubtitle = 'Sesi Tes Aptitude';
         margin: 0 auto;
     }
 
-    .disc-radio-wrapper input[type="radio"] {
-        position: absolute;
-        opacity: 0;
-        width: 1px;
-        height: 1px;
+    .disc-radio-wrapper input[type="radio"],
+    .disc-radio-wrapper input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
         margin: 0;
         cursor: pointer;
-    }
-
-    .disc-radio-custom {
-        height: 20px;
-        width: 20px;
-        background-color: #fff;
-        border: 2px solid #868e96;
-        border-radius: 50%;
-        transition: border-color 0.15s ease, background-color 0.15s ease;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-sizing: border-box;
-    }
-
-    .disc-radio-wrapper:hover .disc-radio-custom {
-        border-color: var(--green-1);
-    }
-
-    .disc-radio-wrapper input:focus-visible ~ .disc-radio-custom {
-        outline: 2px solid var(--green-2);
-        outline-offset: 2px;
-    }
-
-    .disc-radio-wrapper input:checked ~ .disc-radio-custom {
-        background-color: #fff;
-        border-color: var(--green-1);
-        border-width: 2px;
-    }
-
-    .disc-radio-custom:after {
-        content: "";
-        display: none;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: var(--green-1);
-    }
-
-    .disc-radio-wrapper input:checked ~ .disc-radio-custom:after {
-        display: block;
+        accent-color: var(--green-1);
     }
 
     .summary-list {
@@ -1314,7 +1273,7 @@ if ($__stateHrdNameJs === false) {
         positionName: <?= $__statePositionNameJs ?>,
         hrdName: <?= $__stateHrdNameJs ?>,
         sessionCode: defaultSessionCode,
-        isStarted: <?= ($sessionStatus && $sessionStatus['status_sesi'] === 'berjalan') ? 'true' : 'false' ?>,
+        isStarted: false, // Security tracking only starts after clicking 'Mulai Sesi' or 'Lanjutkan Sesi'
         currentSession: <?= $currentSession ?>,
         timeLeftSeconds: <?= (int)$timeLeftSeconds ?>,
         isSubmittingFinal: false,
@@ -1726,19 +1685,18 @@ if ($__stateHrdNameJs === false) {
                         mostCell.className = 'disc-radio-cell';
                         const mostWrapper = document.createElement('label');
                         mostWrapper.className = 'disc-radio-wrapper';
-                        const mostRadio = document.createElement('input');
-                        mostRadio.type = 'radio';
-                        const rowKey = String(option.value);
-                        mostRadio.name = 'discPick_' + q.id + '_' + rowKey;
-                        mostRadio.value = 'most';
-                        mostRadio.checked = (selected.pairs && selected.pairs[rowKey]) === 'most';
+                        const mostCheckbox = document.createElement('input');
+                        mostCheckbox.type = 'checkbox';
+                        mostCheckbox.className = 'disc-checkbox disc-most';
+                        mostCheckbox.dataset.id = q.id;
+                        mostCheckbox.dataset.num = num;
+                        mostCheckbox.value = option.value;
+                        mostCheckbox.checked = (selected.most && selected.most.includes(String(option.value)));
                         
-                        const mostCustom = document.createElement('span');
-                        mostCustom.className = 'disc-radio-custom';
-                        mostWrapper.appendChild(mostRadio);
-                        mostWrapper.appendChild(mostCustom);
+                        mostWrapper.appendChild(mostCheckbox);
                         
-                        mostRadio.addEventListener('change', () => {
+                        mostCheckbox.addEventListener('change', (e) => {
+                            handleDiscLimit(num, e.target);
                             saveCurrentAnswer(q, 'answer_updated');
                         });
                         mostCell.appendChild(mostWrapper);
@@ -1748,19 +1706,18 @@ if ($__stateHrdNameJs === false) {
                         leastCell.className = 'disc-radio-cell';
                         const leastWrapper = document.createElement('label');
                         leastWrapper.className = 'disc-radio-wrapper';
-                        const leastRadio = document.createElement('input');
-                        leastRadio.type = 'radio';
-                        const rowKeyLeast = String(option.value);
-                        leastRadio.name = 'discPick_' + q.id + '_' + rowKeyLeast;
-                        leastRadio.value = 'least';
-                        leastRadio.checked = (selected.pairs && selected.pairs[rowKeyLeast]) === 'least';
+                        const leastCheckbox = document.createElement('input');
+                        leastCheckbox.type = 'checkbox';
+                        leastCheckbox.className = 'disc-checkbox disc-least';
+                        leastCheckbox.dataset.id = q.id;
+                        leastCheckbox.dataset.num = num;
+                        leastCheckbox.value = option.value;
+                        leastCheckbox.checked = (selected.least && selected.least.includes(String(option.value)));
                         
-                        const leastCustom = document.createElement('span');
-                        leastCustom.className = 'disc-radio-custom';
-                        leastWrapper.appendChild(leastRadio);
-                        leastWrapper.appendChild(leastCustom);
+                        leastWrapper.appendChild(leastCheckbox);
                         
-                        leastRadio.addEventListener('change', () => {
+                        leastCheckbox.addEventListener('change', (e) => {
+                            handleDiscLimit(num, e.target);
                             saveCurrentAnswer(q, 'answer_updated');
                         });
                         leastCell.appendChild(leastWrapper);
@@ -1774,6 +1731,9 @@ if ($__stateHrdNameJs === false) {
             table.appendChild(tbody);
             wrap.appendChild(table);
             el.answerOptions.appendChild(wrap);
+
+            // Initial limit check for all groups
+            Object.keys(groupedData).forEach(num => handleDiscLimit(num));
         } else {
             // Render Aptitude (One-by-one)
             const question = currentData[interviewState.current];
@@ -1847,33 +1807,56 @@ if ($__stateHrdNameJs === false) {
         syncSession('question_viewed', 'Membuka soal nomor ' + (interviewState.current + 1));
     }
 
+    function handleDiscLimit(num, target = null) {
+        const allInNum = document.querySelectorAll(`input[data-num="${num}"]`);
+        const checked = Array.from(allInNum).filter(cb => cb.checked);
+        
+        if (checked.length >= 2) {
+            allInNum.forEach(cb => {
+                if (!cb.checked) cb.disabled = true;
+            });
+        } else {
+            allInNum.forEach(cb => {
+                cb.disabled = false;
+            });
+        }
+    }
+
+    let discSaveTimeout = null;
+
     async function saveCurrentAnswer(question, eventType = 'answer_updated') {
         if (!question) return;
 
+        // For Session 1, we use a small debounce to group rapid clicks
+        if (interviewState.currentSession === 1) {
+            if (discSaveTimeout) clearTimeout(discSaveTimeout);
+            discSaveTimeout = setTimeout(() => executeSaveAnswer(question, eventType), 500);
+        } else {
+            await executeSaveAnswer(question, eventType);
+        }
+    }
+
+    async function executeSaveAnswer(question, eventType = 'answer_updated') {
         let val = null;
         let most = [];
         let least = [];
         let pairs = {};
 
         if (interviewState.currentSession === 1) {
-            const pickedRows = document.querySelectorAll(`input[name^="discPick_${question.id}_"]:checked`);
-            pickedRows.forEach((radio) => {
-                const name = radio.name || '';
-                const parts = name.split('_');
-                const optionKey = parts.length >= 3 ? parts.slice(2).join('_') : '';
-                const pickType = radio.value === 'most' ? 'most' : 'least';
-                if (optionKey) {
-                    pairs[optionKey] = pickType;
-                }
+            const num = question.number;
+            const checked = document.querySelectorAll(`input[data-num="${num}"]:checked`);
+            
+            checked.forEach(cb => {
+                const type = cb.classList.contains('disc-most') ? 'most' : 'least';
+                if (type === 'most') most.push(cb.value);
+                else least.push(cb.value);
+                pairs[cb.value] = type;
             });
-
-            most = Object.keys(pairs).filter((k) => pairs[k] === 'most');
-            least = Object.keys(pairs).filter((k) => pairs[k] === 'least');
 
             if (!interviewState.allAnswers[1]) {
                 interviewState.allAnswers[1] = {};
             }
-            if (Object.keys(pairs).length > 0) {
+            if (most.length > 0 || least.length > 0) {
                 interviewState.allAnswers[1][question.id] = { pairs, most, least };
                 val = interviewState.allAnswers[1][question.id];
             } else {
@@ -2018,10 +2001,8 @@ if ($__stateHrdNameJs === false) {
             const missing = [];
             currentData.forEach(q => {
                 const ans = currentAnswers[q.id];
-                const pairs = ans && ans.pairs ? ans.pairs : {};
-                const pickedCount = Object.keys(pairs).length;
-                const requiredCount = Array.isArray(q.options) ? q.options.length : 0;
-                if (!ans || pickedCount < requiredCount) {
+                const total = (ans && ans.most ? ans.most.length : 0) + (ans && ans.least ? ans.least.length : 0);
+                if (!ans || total !== 2) {
                     missing.push(q.number);
                 }
             });
@@ -2134,19 +2115,22 @@ if ($__stateHrdNameJs === false) {
     });
 
     document.addEventListener('fullscreenchange', () => {
-        if (!document.fullscreenElement && !interviewState.isLocked && interviewState.isStarted) {
+        const isQuestionActive = el.questionState.classList.contains('active');
+        if (!document.fullscreenElement && !interviewState.isLocked && interviewState.isStarted && isQuestionActive) {
             registerSecurityViolation('fullscreen', 'Peserta keluar dari mode fullscreen.');
         }
     });
 
     window.addEventListener('blur', () => {
-        if (!interviewState.isLocked && interviewState.isStarted) {
+        const isQuestionActive = el.questionState.classList.contains('active');
+        if (!interviewState.isLocked && interviewState.isStarted && isQuestionActive) {
             registerSecurityViolation('tab', 'Peserta terdeteksi berpindah tab atau aplikasi.');
         }
     });
 
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden' && !interviewState.isLocked && interviewState.isStarted) {
+        const isQuestionActive = el.questionState.classList.contains('active');
+        if (document.visibilityState === 'hidden' && !interviewState.isLocked && interviewState.isStarted && isQuestionActive) {
             registerSecurityViolation('tab', 'Peserta terdeteksi meninggalkan halaman tes.');
         }
     });

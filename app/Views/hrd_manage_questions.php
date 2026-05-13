@@ -260,7 +260,7 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
 <div class="modal fade" id="addQuestionModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content border-0 shadow">
-            <form action="<?= site_url('manage-questions/add/' . $currentSession) ?>" method="post" enctype="multipart/form-data">
+            <form action="<?= site_url('manage-questions/add/' . $currentSession) ?>" method="post" enctype="multipart/form-data" novalidate>
                 <div class="modal-header border-0 bg-light">
                     <h5 class="modal-title fw-800">Tambah Pertanyaan Baru</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -270,13 +270,13 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
                         <div class="col-md-8">
                             <div class="mb-3">
                                 <label class="form-label fw-700">Isi Pertanyaan</label>
-                                <textarea name="isi_pertanyaan" class="form-control" rows="3" required placeholder="Tuliskan pertanyaan di sini..."></textarea>
+                                <textarea name="isi_pertanyaan" class="form-control" rows="3" placeholder="Tuliskan pertanyaan di sini..."></textarea>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="mb-3">
                                 <label class="form-label fw-700">Tipe Pertanyaan</label>
-                                <select name="tipe_pertanyaan" class="form-select" required>
+                                <select name="tipe_pertanyaan" class="form-select">
                                     <option value="text">Text</option>
                                     <option value="angka">Angka</option>
                                     <option value="gambar">Gambar</option>
@@ -319,7 +319,7 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
                     <div class="row mt-3">
                         <div class="col-md-6">
                             <label class="form-label fw-700">Jawaban Benar</label>
-                            <select name="jawaban_benar" class="form-select" required>
+                            <select name="jawaban_benar" class="form-select">
                                 <option value="A">A</option>
                                 <option value="B">B</option>
                                 <option value="C">C</option>
@@ -329,7 +329,7 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-700">Status</label>
-                            <select name="status_pertanyaan" class="form-select" required>
+                            <select name="status_pertanyaan" class="form-select">
                                 <option value="Aktif">Aktif</option>
                                 <option value="Nonaktif">Nonaktif</option>
                             </select>
@@ -349,7 +349,7 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
 <div class="modal fade" id="editQuestionModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content border-0 shadow">
-            <form action="<?= site_url('manage-questions/update/' . $currentSession) ?>" method="post" enctype="multipart/form-data">
+            <form action="<?= site_url('manage-questions/update/' . $currentSession) ?>" method="post" enctype="multipart/form-data" novalidate>
                 <div class="modal-header border-0 bg-light">
                     <h5 class="modal-title fw-800">Edit Pertanyaan</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -360,13 +360,13 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
                         <div class="col-md-8">
                             <div class="mb-3">
                                 <label class="form-label fw-700">Isi Pertanyaan</label>
-                                <textarea name="isi_pertanyaan" id="edit_isi_pertanyaan" class="form-control" rows="3" required></textarea>
+                                <textarea name="isi_pertanyaan" id="edit_isi_pertanyaan" class="form-control" rows="3"></textarea>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="mb-3">
                                 <label class="form-label fw-700">Tipe Pertanyaan</label>
-                                <select name="tipe_pertanyaan" id="edit_tipe_pertanyaan" class="form-select" required>
+                                <select name="tipe_pertanyaan" id="edit_tipe_pertanyaan" class="form-select">
                                     <option value="text">Text</option>
                                     <option value="angka">Angka</option>
                                     <option value="gambar">Gambar</option>
@@ -409,7 +409,7 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
                     <div class="row mt-3">
                         <div class="col-md-6">
                             <label class="form-label fw-700">Jawaban Benar</label>
-                            <select name="jawaban_benar" id="edit_jawaban_benar" class="form-select" required>
+                            <select name="jawaban_benar" id="edit_jawaban_benar" class="form-select">
                                 <option value="A">A</option>
                                 <option value="B">B</option>
                                 <option value="C">C</option>
@@ -419,7 +419,7 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-700">Status</label>
-                            <select name="status_pertanyaan" id="edit_status_pertanyaan" class="form-select" required>
+                            <select name="status_pertanyaan" id="edit_status_pertanyaan" class="form-select">
                                 <option value="Aktif">Aktif</option>
                                 <option value="Nonaktif">Nonaktif</option>
                             </select>
@@ -454,18 +454,11 @@ $headerSubtitle = 'Kelola pertanyaan tes interview';
             textWrap.style.display = 'none';
             imgWrap.style.display = 'block';
             textInput.required = false;
-            
-            if (mode === 'add') {
-                imgInput.required = true;
-            } else {
-                const preview = document.getElementById(`edit_preview_${opt}`);
-                const hasExisting = preview && preview.querySelector('img') !== null;
-                imgInput.required = !hasExisting;
-            }
+            imgInput.required = false;
         } else {
             textWrap.style.display = 'block';
             imgWrap.style.display = 'none';
-            textInput.required = true;
+            textInput.required = false;
             imgInput.required = false;
         }
     }

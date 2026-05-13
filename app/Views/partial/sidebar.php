@@ -36,9 +36,9 @@
                 </a>
             <?php endif; ?>
 
-            <a class="nav-link <?= url_is('tes-interview') ? 'active' : '' ?>" href="<?= site_url('tes-interview') ?>">
+            <!-- <a class="nav-link <?= url_is('tes-interview') ? 'active' : '' ?>" href="<?= site_url('tes-interview') ?>">
                 <i class="bi bi-clipboard2-check"></i> Halaman Tes
-            </a>
+            </a> -->
 
             <?php if (url_is('tes-interview')) : ?>
                 <a class="nav-link" href="#" id="openInterviewRulesLink">

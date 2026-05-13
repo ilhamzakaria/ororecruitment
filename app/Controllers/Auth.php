@@ -79,19 +79,6 @@ class Auth extends BaseController
                     ->with('last_id_user', strtoupper(trim($idUser)));
             }
 
-            /*
-            // Single login enforcement for pegawai
-            if ($user['role'] === 'pegawai') {
-                // If there's already a session_id and it's different from current
-                if ($user['session_id'] !== null && $user['session_id'] !== session_id()) {
-                    return redirect()
-                        ->to(site_url('login'))
-                        ->with('error', 'Akun ini sedang login di perangkat lain. Hanya boleh 1 login aktif.')
-                        ->with('last_id_user', strtoupper(trim($idUser)));
-                }
-            }
-            */
-
             $session->regenerate(true);
             $session->set('auth_user', $user);
 

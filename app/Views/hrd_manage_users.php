@@ -506,7 +506,7 @@ foreach ($pegawai as $p) {
 <div class="modal fade" id="userModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content border-0 shadow">
-            <form id="userForm" method="post">
+            <form id="userForm" method="post" novalidate>
                 <div class="modal-header border-0 bg-light">
                     <h5 class="modal-title fw-800" id="modalTitle">Edit User</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -516,11 +516,11 @@ foreach ($pegawai as $p) {
                     <input type="hidden" name="role" id="userRole">
                     <div class="mb-3">
                         <label>Nama Lengkap</label>
-                        <input type="text" name="nama" id="userName" required>
+                        <input type="text" name="nama" id="userName">
                     </div>
                     <div class="mb-3">
                         <label>Username</label>
-                        <input type="text" name="username" id="userUsername" required>
+                        <input type="text" name="username" id="userUsername">
                     </div>
                     <div class="mb-3">
                         <label>Password <small class="text-muted">(Kosongkan jika tidak diubah)</small></label>
@@ -550,7 +550,7 @@ foreach ($pegawai as $p) {
 <div class="modal fade" id="addUserModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content border-0 shadow">
-            <form action="<?= site_url('manage-users/add') ?>" method="post">
+            <form action="<?= site_url('manage-users/add') ?>" method="post" novalidate>
                 <div class="modal-header border-0 bg-light">
                     <h5 class="modal-title fw-800">Tambah User Baru</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -568,15 +568,15 @@ foreach ($pegawai as $p) {
                     </div>
                     <div class="mb-3">
                         <label>Nama Lengkap</label>
-                        <input type="text" name="nama" required placeholder="Andi Saputra">
+                        <input type="text" name="nama" placeholder="Andi Saputra">
                     </div>
                     <div class="mb-3">
                         <label>Username</label>
-                        <input type="text" name="username" required placeholder="andisaputra">
+                        <input type="text" name="username" placeholder="andisaputra">
                     </div>
                     <div class="mb-3">
                         <label>Password</label>
-                        <input type="password" name="password" required>
+                        <input type="password" name="password">
                     </div>
                     <div id="addPegawaiFields">
                         <div class="mb-3">
